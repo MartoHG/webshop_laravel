@@ -267,7 +267,9 @@ VarianteProducto
 - El SKU de una variante desactivada no se reutiliza en otra variante.
 - Una variante nueva se crea inactiva y el administrador debe activarla expresamente.
 - Cada variante tendrá su propio precio base, siempre mayor a $0 y con hasta dos decimales.
-- Una variante inactiva puede guardarse sin imagen. Para mostrarse al cliente debe contar con una imagen; si es la única variante del producto, puede utilizar la imagen general.
+- Un producto inactivo puede guardarse con varias variantes inactivas y sin imágenes.
+- Una variante inactiva puede guardarse sin imagen, pero no puede activarse hasta tener una imagen asignada.
+- Cuando hay varias variantes activas, cada una necesita una imagen asignada a esa variante; si el producto tiene una sola variante, esta puede utilizar la imagen general.
 - Una variante puede tener varias imágenes y, en ese caso, debe tener una imagen principal.
 - Una variante puede estar activa pero no disponible.
 - Una variante no disponible sigue visible en el producto, marcada como agotada.
@@ -391,6 +393,7 @@ imagenes_producto
 - Si `variante_producto_id` es `null`, la imagen es general.
 - Si una variante tiene imágenes propias, podrán mostrarse al seleccionar esa variante.
 - Si el producto tiene una sola variante, la imagen general puede utilizarse también para esa variante.
+- El mismo archivo de imagen puede asignarse como imagen general y a una variante, o a varias variantes, sin subirlo nuevamente.
 - Debe existir orden manual.
 - Debe existir imagen principal.
 - La base de datos guarda rutas, no binarios.
