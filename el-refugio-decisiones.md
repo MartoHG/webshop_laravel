@@ -221,6 +221,7 @@ Producto
 - Un producto puede pertenecer a varias categorías.
 - El producto no tendrá precio directamente.
 - Todo producto tendrá al menos una variante interna.
+- El `slug` del producto se conserva cuando cambia su nombre, para mantener estable el enlace.
 - Un producto puede estar activo pero no disponible.
 - Un producto desactivado no debe aparecer públicamente.
 - Un producto agotado/no disponible no debe aparecer en la home.
@@ -241,6 +242,7 @@ Conceptualmente:
 VarianteProducto
 ├── producto_id
 ├── color nullable
+├── etiqueta descriptiva
 ├── sku
 ├── precio_base
 ├── activo
@@ -254,8 +256,9 @@ VarianteProducto
 - `color` puede ser `null`.
 - Una variante sin color puede coexistir con variantes de color dentro del mismo producto.
 - El color no debe ser único dentro de un producto: pueden existir varias variantes del mismo color o varias sin color, diferenciadas por su SKU.
-- Cada variante tendrá SKU.
-- Cada variante tendrá su propio precio base, siempre mayor a $0.
+- Cuando haya variantes con el mismo color o varias sin color, una etiqueta descriptiva permitirá al cliente distinguirlas.
+- Cada variante tendrá SKU único en toda la tienda.
+- Cada variante tendrá su propio precio base, siempre mayor a $0 y con hasta dos decimales.
 - Cada variante puede tener varias imágenes.
 - Una variante puede estar activa pero no disponible.
 - Una variante no disponible sigue visible en el producto, marcada como agotada.
