@@ -223,7 +223,8 @@ Producto
 - Todo producto tendrá al menos una variante interna.
 - El `slug` del producto queda fijo después de crearlo: cambiar el nombre no modifica el enlace y el administrador no lo edita en V1.
 - Los productos nuevos se crean inactivos y permanecen ocultos hasta que el administrador los active.
-- Para activar un producto, debe tener al menos una categoría asignada y una imagen principal.
+- Un producto inactivo puede guardarse sin categoría ni imagen mientras se completa.
+- Para activar un producto, debe tener al menos una categoría activa asignada, una imagen general principal y al menos una variante activa.
 - Un producto puede estar activo pero no disponible.
 - Un producto desactivado no debe aparecer públicamente.
 - Un producto agotado/no disponible no debe aparecer en la home.
@@ -265,7 +266,7 @@ VarianteProducto
 - El SKU de una variante desactivada no se reutiliza en otra variante.
 - Una variante nueva se crea inactiva y el administrador debe activarla expresamente.
 - Cada variante tendrá su propio precio base, siempre mayor a $0 y con hasta dos decimales.
-- Cada variante puede tener varias imágenes.
+- Cada variante debe contar con al menos una imagen propia para mostrarse al cliente y puede tener varias.
 - Una variante puede estar activa pero no disponible.
 - Una variante no disponible sigue visible en el producto, marcada como agotada.
 - Una variante no disponible no puede agregarse al carrito.
