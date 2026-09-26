@@ -225,6 +225,7 @@ Producto
 - Los productos nuevos se crean inactivos y permanecen ocultos hasta que el administrador los active.
 - Un producto inactivo puede guardarse sin categoría ni imagen mientras se completa.
 - Para activar un producto, debe tener al menos una categoría activa asignada, una imagen general principal y al menos una variante activa.
+- Se rechazan los cambios que dejarían a un producto activo sin su última categoría activa, sin imagen general principal o sin ninguna variante activa; no se lo desactiva automáticamente.
 - Un producto puede estar activo pero no disponible.
 - Un producto desactivado no debe aparecer públicamente.
 - Un producto agotado/no disponible no debe aparecer en la home.
@@ -266,7 +267,8 @@ VarianteProducto
 - El SKU de una variante desactivada no se reutiliza en otra variante.
 - Una variante nueva se crea inactiva y el administrador debe activarla expresamente.
 - Cada variante tendrá su propio precio base, siempre mayor a $0 y con hasta dos decimales.
-- Cada variante debe contar con al menos una imagen propia para mostrarse al cliente y puede tener varias.
+- Una variante inactiva puede guardarse sin imagen. Para mostrarse al cliente debe contar con una imagen; si es la única variante del producto, puede utilizar la imagen general.
+- Una variante puede tener varias imágenes y, en ese caso, debe tener una imagen principal.
 - Una variante puede estar activa pero no disponible.
 - Una variante no disponible sigue visible en el producto, marcada como agotada.
 - Una variante no disponible no puede agregarse al carrito.
@@ -331,6 +333,8 @@ Las categorías normales podrán:
 - ordenarse;
 - asignarse a múltiples productos.
 
+No se puede desactivar una categoría si con ello algún producto activo quedaría sin ninguna categoría activa.
+
 ---
 
 # 12. Categoría especial “Ofertas”
@@ -386,6 +390,7 @@ imagenes_producto
 
 - Si `variante_producto_id` es `null`, la imagen es general.
 - Si una variante tiene imágenes propias, podrán mostrarse al seleccionar esa variante.
+- Si el producto tiene una sola variante, la imagen general puede utilizarse también para esa variante.
 - Debe existir orden manual.
 - Debe existir imagen principal.
 - La base de datos guarda rutas, no binarios.
