@@ -255,7 +255,7 @@ VarianteProducto
 - Una variante sin color puede coexistir con variantes de color dentro del mismo producto.
 - El color no debe ser único dentro de un producto: pueden existir varias variantes del mismo color o varias sin color, diferenciadas por su SKU.
 - Cada variante tendrá SKU.
-- Cada variante tendrá su propio precio base.
+- Cada variante tendrá su propio precio base, siempre mayor a $0.
 - Cada variante puede tener varias imágenes.
 - Una variante puede estar activa pero no disponible.
 - Una variante no disponible sigue visible en el producto, marcada como agotada.
