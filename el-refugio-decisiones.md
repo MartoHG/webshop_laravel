@@ -269,7 +269,9 @@ VarianteProducto
 - Cada variante tendrá su propio precio base, siempre mayor a $0 y con hasta dos decimales.
 - Un producto inactivo puede guardarse con varias variantes inactivas y sin imágenes.
 - Una variante inactiva puede guardarse sin imagen, pero no puede activarse hasta tener una imagen asignada.
-- Cuando hay varias variantes activas, cada una necesita una imagen asignada a esa variante; si el producto tiene una sola variante, esta puede utilizar la imagen general.
+- Una variante puede activarse mientras su producto está inactivo; el producto permanece oculto hasta que se active expresamente.
+- Si solo hay una variante activa, puede utilizar la imagen general aunque existan otras variantes inactivas. Al activar una segunda variante, ambas deben tener una imagen asignada a cada variante.
+- Se rechaza retirar la última imagen que utiliza una variante activa; no se la desactiva automáticamente.
 - Una variante puede tener varias imágenes y, en ese caso, debe tener una imagen principal.
 - Una variante puede estar activa pero no disponible.
 - Una variante no disponible sigue visible en el producto, marcada como agotada.
@@ -392,7 +394,7 @@ imagenes_producto
 
 - Si `variante_producto_id` es `null`, la imagen es general.
 - Si una variante tiene imágenes propias, podrán mostrarse al seleccionar esa variante.
-- Si el producto tiene una sola variante, la imagen general puede utilizarse también para esa variante.
+- Si solo hay una variante activa, la imagen general puede utilizarse también para esa variante aunque existan otras inactivas.
 - El mismo archivo de imagen puede asignarse como imagen general y a una variante, o a varias variantes, sin subirlo nuevamente.
 - Debe existir orden manual.
 - Debe existir imagen principal.
@@ -1336,11 +1338,14 @@ Funcionalmente el panel deberá permitir gestionar:
 
 Las primeras fases de implementación serán **solo de backend**: modelo de datos, reglas de negocio, validaciones, autorización, rutas/controladores, integraciones y pruebas sobre MySQL. Las vistas Blade, el panel administrativo y el diseño de la tienda se implementarán en fases posteriores. Los endpoints administrativos podrán quedar preparados antes de construir sus pantallas.
 
+Productos y variantes pueden implementarse primero como borradores inactivos. La gestión de categorías y la carga/procesamiento de imágenes deben estar disponibles antes de activar productos, porque la activación exige una categoría activa, una imagen general principal y al menos una variante activa con imagen.
+
 | Prioridad | Módulo |
 |---|---|
 | Alta | Autenticación y roles |
 | Alta | Productos y variantes |
 | Alta | Categorías y Ofertas |
+| Alta | Imágenes de producto y procesamiento en cola |
 | Alta | Precios y ajuste e-commerce |
 | Alta | Carrito |
 | Alta | Checkout |
@@ -1350,7 +1355,6 @@ Las primeras fases de implementación serán **solo de backend**: modelo de dato
 | Alta | Reglas de cuotas |
 | Alta | Webhooks e idempotencia |
 | Media | Emails |
-| Media | Procesamiento de imágenes |
 | Media | Actualizaciones masivas de precios |
 | Media | Auditoría |
 | Media | Historial de pedidos de cliente |
