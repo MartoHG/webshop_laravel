@@ -223,6 +223,7 @@ Producto
 - Todo producto tendrá al menos una variante interna.
 - El `slug` del producto queda fijo después de crearlo: cambiar el nombre no modifica el enlace y el administrador no lo edita en V1.
 - Los productos nuevos se crean inactivos y permanecen ocultos hasta que el administrador los active.
+- Para activar un producto, debe tener al menos una categoría asignada y una imagen principal.
 - Un producto puede estar activo pero no disponible.
 - Un producto desactivado no debe aparecer públicamente.
 - Un producto agotado/no disponible no debe aparecer en la home.
@@ -255,11 +256,14 @@ VarianteProducto
 
 - Productos sin color también tendrán una variante interna.
 - `color` puede ser `null` y, cuando se informa, es texto libre; no existe un catálogo de colores en V1.
+- Para detectar colores repetidos, se ignoran las diferencias entre mayúsculas y minúsculas y los espacios al principio o al final.
 - Una variante sin color puede coexistir con variantes de color dentro del mismo producto.
 - El color no debe ser único dentro de un producto: pueden existir varias variantes del mismo color o varias sin color, diferenciadas por su SKU.
-- La etiqueta descriptiva es obligatoria cuando haya dos o más opciones del mismo producto con el mismo color, incluido `null`; en los demás casos es opcional.
+- La etiqueta descriptiva es obligatoria para todas las variantes de un producto que compartan color, incluido `null`, aunque alguna esté inactiva; en los demás casos es opcional.
+- Las etiquetas descriptivas informadas deben ser distintas dentro de un mismo producto.
 - Cada variante tendrá SKU único en toda la tienda.
 - El SKU de una variante desactivada no se reutiliza en otra variante.
+- Una variante nueva se crea inactiva y el administrador debe activarla expresamente.
 - Cada variante tendrá su propio precio base, siempre mayor a $0 y con hasta dos decimales.
 - Cada variante puede tener varias imágenes.
 - Una variante puede estar activa pero no disponible.
