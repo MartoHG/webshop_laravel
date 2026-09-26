@@ -1314,6 +1314,8 @@ Funcionalmente el panel deberá permitir gestionar:
 
 # 48. Prioridad sugerida de implementación
 
+Las primeras fases de implementación serán **solo de backend**: modelo de datos, reglas de negocio, validaciones, autorización, rutas/controladores, integraciones y pruebas sobre MySQL. Las vistas Blade, el panel administrativo y el diseño de la tienda se implementarán en fases posteriores. Los endpoints administrativos podrán quedar preparados antes de construir sus pantallas.
+
 | Prioridad | Módulo |
 |---|---|
 | Alta | Autenticación y roles |
