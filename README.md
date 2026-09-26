@@ -28,12 +28,16 @@ composer run dev
 
 La aplicación queda disponible en `http://localhost:8000`. El archivo `.env`, las bases MySQL, `vendor/`, `node_modules/` y los recursos compilados son locales y no se versionan.
 
-## Estructura inicial
+## Estado del backend
 
-- `app/Http/Controllers/Tienda` y `app/Http/Controllers/Administracion`: controladores HTTP por área.
+- `app/Http/Controllers`: endpoints de autenticación, cuenta y administración.
 - `app/Http/Requests`: validación y autorización de entradas.
 - `app/Servicios`: lógica de negocio.
-- `app/Models`: modelos Eloquent.
-- `resources/views/tienda` y `resources/views/administracion`: vistas Blade por área.
+- `app/Models/Usuario.php`: modelo de clientes y administradores en `usuarios`.
+- `routes/autenticacion.php`, `routes/cuenta.php` y `routes/administracion.php`: rutas backend cargadas desde `routes/web.php`.
 
-Es solo el esqueleto del proyecto: todavía no se implementaron productos, pedidos ni pagos. El modelo `User` y las migraciones iniciales siguen siendo los del Laravel base; se adaptarán al dominio en la fase de autenticación.
+La fase backend incluye registro, inicio/cierre de sesión, verificación de correo, restablecimiento de clave, edición de perfil y administración básica de usuarios. La verificación y la recuperación tienen respuestas HTTP/JSON; todavía no hay pantallas Blade de autenticación, cuenta o administración.
+
+Después de configurar MySQL y ejecutar las migraciones, crea el primer administrador con `php artisan usuario:crear-administrador`. El comando solicita los datos y la clave de forma interactiva; solo funciona mientras todavía no exista una cuenta administradora.
+
+Todavía no se implementaron productos, pedidos ni pagos. Las migraciones iniciales ahora crean `usuarios` y las tablas auxiliares de sesiones y restablecimiento de clave.
