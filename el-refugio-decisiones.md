@@ -48,6 +48,11 @@ Las decisiones visuales y de UX serán definidas aparte por **DesignerGPT**.
 - Tailwind CSS
 - HTMX para interactividad puntual
 
+## Base de datos
+
+- MySQL para desarrollo local, pruebas y producción.
+- Las pruebas deben conectarse a una base MySQL exclusiva, separada de la base de desarrollo.
+
 ## Enfoque
 
 Aplicación Laravel tradicional.
