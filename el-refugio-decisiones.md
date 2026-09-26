@@ -179,11 +179,15 @@ Datos principales:
 ## Reglas
 
 - Email obligatorio.
-- DNI obligatorio.
+- DNI obligatorio y único por usuario.
 - Teléfono obligatorio.
 - No habrá validación automática del teléfono mediante WhatsApp API en V1.
 - La validación práctica del número se realizará durante la coordinación del pedido.
-- Se recomienda verificación de email.
+- El usuario puede registrarse, iniciar sesión y usar el carrito sin verificar su email.
+- Para confirmar el checkout y crear el pedido, el email debe estar verificado. Esto permite usarlo como canal alternativo si el teléfono es incorrecto.
+- El cliente puede modificar su email, teléfono y DNI desde su cuenta. El DNI nuevo debe seguir siendo único.
+- Si modifica el email, deberá verificar la nueva dirección antes de confirmar otro checkout.
+- El registro público solo crea cuentas de cliente. Un administrador puede crear otras cuentas de administrador desde el panel.
 - Un usuario desactivado no podrá iniciar sesión.
 - Los pedidos históricos deben conservarse aunque un usuario sea desactivado.
 
@@ -583,6 +587,8 @@ Para V1 puede mantenerse en sesión.
 El checkout **no realiza el pago inmediatamente**.
 
 Su función es crear el pedido para iniciar la coordinación del envío.
+
+La confirmación final del checkout requiere que el cliente tenga el email verificado.
 
 Flujo:
 
@@ -1296,6 +1302,8 @@ Funcionalmente el panel deberá permitir gestionar:
 25. Si se necesita modificar algo después de generar la orden de pago, se cancela esa orden y se genera un pedido nuevo.
 26. La V1 no gestiona cancelaciones ni devoluciones de pedidos pagados dentro de la página; esos casos se resuelven por WhatsApp.
 27. El porcentaje de la modalidad/cuotas se compensa sobre el total del pedido, incluido el envío; productos y envío se cobran juntos.
+28. El DNI es único por usuario. El email se verifica antes de confirmar el checkout y crear el pedido, sin bloquear el registro, el inicio de sesión ni el carrito.
+29. El cliente puede modificar su DNI, email y teléfono; cambiar el email exige verificar la nueva dirección. Solo un administrador puede crear otras cuentas de administrador.
 
 ---
 
