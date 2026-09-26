@@ -252,6 +252,7 @@ VarianteProducto
 
 - Productos sin color también tendrán una variante interna.
 - `color` puede ser `null`.
+- Una variante sin color puede coexistir con variantes de color dentro del mismo producto.
 - Cada variante tendrá SKU.
 - Cada variante tendrá su propio precio base.
 - Cada variante puede tener varias imágenes.
