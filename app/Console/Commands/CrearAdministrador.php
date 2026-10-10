@@ -3,9 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Models\Usuario;
+use App\Servicios\Auditoria\AuditoriaService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -13,7 +15,7 @@ use Illuminate\Support\Facades\Validator;
 #[Description('Crea la cuenta del primer administrador del sistema.')]
 class CrearAdministrador extends Command
 {
-    public function handle(): int
+    public function handle(AuditoriaService $auditoria): int
     {
         if (Usuario::query()->where('rol', 'administrador')->exists()) {
             $this->error('Ya existe al menos un administrador.');
@@ -56,12 +58,21 @@ class CrearAdministrador extends Command
             return self::FAILURE;
         }
 
-        Usuario::query()->create([
-            ...$validador->validated(),
-            'password' => Hash::make($datos['password']),
-            'rol' => 'administrador',
-            'activo' => true,
-        ]);
+        DB::transaction(function () use ($validador, $datos, $auditoria): void {
+            $administrador = Usuario::query()->create([
+                ...$validador->validated(),
+                'password' => Hash::make($datos['password']),
+                'rol' => 'administrador',
+                'activo' => true,
+            ]);
+
+            $auditoria->registrar('usuario.administrador_creado', $administrador, [], [
+                'nombre' => $administrador->nombre,
+                'apellido' => $administrador->apellido,
+                'email' => $administrador->email,
+                'rol' => $administrador->rol,
+            ]);
+        });
 
         $this->info('Administrador creado.');
 

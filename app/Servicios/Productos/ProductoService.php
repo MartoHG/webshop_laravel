@@ -3,6 +3,7 @@
 namespace App\Servicios\Productos;
 
 use App\Models\Producto;
+use App\Servicios\Auditoria\AuditoriaService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -10,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class ProductoService
 {
+    public function __construct(private AuditoriaService $auditoria) {}
+
     /** @return Collection<int, Producto> */
     public function listar(): Collection
     {
@@ -109,9 +112,18 @@ class ProductoService
                 }
             }
 
+            $estadoAnterior = ['activo' => $producto->activo, 'disponible' => $producto->disponible];
+
             $producto->activo = $activo;
             $producto->disponible = $disponible;
             $producto->save();
+
+            $this->auditoria->registrarCambios(
+                'producto.estado_actualizado',
+                $producto,
+                $estadoAnterior,
+                ['activo' => $activo, 'disponible' => $disponible],
+            );
 
             return $this->mostrar($producto->refresh());
         });

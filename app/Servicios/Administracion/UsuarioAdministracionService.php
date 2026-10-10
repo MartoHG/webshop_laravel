@@ -3,6 +3,7 @@
 namespace App\Servicios\Administracion;
 
 use App\Models\Usuario;
+use App\Servicios\Auditoria\AuditoriaService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -11,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class UsuarioAdministracionService
 {
+    public function __construct(private AuditoriaService $auditoria) {}
+
     /** @param array{nombre: string, apellido: string, dni: string, email: string, telefono: string} $datos */
     public function crearAdministrador(array $datos): Usuario
     {
@@ -22,6 +25,13 @@ class UsuarioAdministracionService
             $usuario->email_verified_at = null;
             $usuario->password = Hash::make(Str::random(64));
             $usuario->save();
+
+            $this->auditoria->registrar('usuario.administrador_creado', $usuario, [], [
+                'nombre' => $usuario->nombre,
+                'apellido' => $usuario->apellido,
+                'email' => $usuario->email,
+                'rol' => $usuario->rol,
+            ]);
 
             $estado = Password::sendResetLink(['email' => $usuario->email]);
 
@@ -60,8 +70,18 @@ class UsuarioAdministracionService
                 }
             }
 
+            $activoAnterior = $usuario->activo;
+
             $usuario->activo = $activo;
             $usuario->save();
+
+            $this->auditoria->registrarCambios(
+                'usuario.estado_actualizado',
+                $usuario,
+                ['activo' => $activoAnterior],
+                ['activo' => $activo],
+                $administrador,
+            );
 
             return $usuario->refresh();
         });

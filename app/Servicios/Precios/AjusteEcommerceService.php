@@ -3,11 +3,14 @@
 namespace App\Servicios\Precios;
 
 use App\Models\Configuracion;
+use App\Servicios\Auditoria\AuditoriaService;
 use Illuminate\Support\Facades\DB;
 
 class AjusteEcommerceService
 {
     private const string CLAVE_PORCENTAJE = 'ajuste_ecommerce_porcentaje';
+
+    public function __construct(private AuditoriaService $auditoria) {}
 
     public function obtenerPorcentaje(): ?string
     {
@@ -21,9 +24,19 @@ class AjusteEcommerceService
         $porcentaje = $this->normalizarPorcentaje($porcentaje);
 
         return DB::transaction(function () use ($porcentaje): string {
-            Configuracion::query()->updateOrCreate(
-                ['clave' => self::CLAVE_PORCENTAJE],
-                ['valor' => $porcentaje],
+            $configuracion = Configuracion::query()
+                ->lockForUpdate()
+                ->firstOrNew(['clave' => self::CLAVE_PORCENTAJE]);
+            $porcentajeAnterior = $configuracion->valor;
+
+            $configuracion->valor = $porcentaje;
+            $configuracion->save();
+
+            $this->auditoria->registrarCambios(
+                'configuracion.ajuste_ecommerce_actualizado',
+                $configuracion,
+                ['porcentaje' => $porcentajeAnterior],
+                ['porcentaje' => $porcentaje],
             );
 
             return $porcentaje;

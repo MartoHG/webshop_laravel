@@ -4,12 +4,13 @@ namespace App\Servicios\Productos;
 
 use App\Models\Producto;
 use App\Models\VarianteProducto;
+use App\Servicios\Auditoria\AuditoriaService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class VarianteProductoService
 {
-    public function __construct(private ProductoService $productoService) {}
+    public function __construct(private ProductoService $productoService, private AuditoriaService $auditoria) {}
 
     /** @param array{color?: ?string, etiqueta?: ?string, sku: string, precio_base: numeric-string|int|float} $datos */
     public function crear(Producto $producto, array $datos): VarianteProducto
@@ -74,9 +75,18 @@ class VarianteProductoService
                 }
             }
 
+            $estadoAnterior = ['activo' => $variante->activo, 'disponible' => $variante->disponible];
+
             $variante->activo = $activo;
             $variante->disponible = $disponible;
             $variante->save();
+
+            $this->auditoria->registrarCambios(
+                'variante_producto.estado_actualizado',
+                $variante,
+                $estadoAnterior,
+                ['activo' => $activo, 'disponible' => $disponible],
+            );
 
             return $variante->refresh();
         });
@@ -95,13 +105,23 @@ class VarianteProductoService
             ])->all();
             $this->productoService->validarVariantes($candidatas);
 
+            $precioAnterior = (string) $variante->precio_base;
+
             $variante->fill($datos);
             $variante->color = trim((string) $variante->color) !== '' ? trim((string) $variante->color) : null;
             $variante->etiqueta = trim((string) $variante->etiqueta) !== '' ? trim((string) $variante->etiqueta) : null;
             $variante->sku = trim($variante->sku);
             $variante->save();
+            $variante->refresh();
 
-            return $variante->refresh();
+            $this->auditoria->registrarCambios(
+                'variante_producto.precio_base_actualizado',
+                $variante,
+                ['precio_base' => $precioAnterior],
+                ['precio_base' => (string) $variante->precio_base],
+            );
+
+            return $variante;
         });
     }
 
