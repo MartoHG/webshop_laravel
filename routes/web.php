@@ -14,4 +14,5 @@ require __DIR__.'/categorias.php';
 require __DIR__.'/imagenes.php';
 require __DIR__.'/precios.php';
 require __DIR__.'/catalogo.php';
+require __DIR__.'/carrito.php';
 require __DIR__.'/auditoria.php';
