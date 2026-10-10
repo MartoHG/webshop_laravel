@@ -2,6 +2,8 @@
 
 Antes de implementar funcionalidades, leer `el-refugio-decisiones.md`. Sus decisiones de negocio y arquitectura rigen este proyecto.
 
+Al retomar el trabajo, leer `PROXIMOS-PASOS.md`: dice dónde quedó el proyecto, cómo se trabaja y qué sigue.
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
