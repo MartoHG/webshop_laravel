@@ -19,3 +19,4 @@ require __DIR__.'/auditoria.php';
 require __DIR__.'/checkout.php';
 require __DIR__.'/pedidos.php';
 require __DIR__.'/pago.php';
+require __DIR__.'/webhooks.php';

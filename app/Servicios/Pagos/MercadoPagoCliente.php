@@ -49,6 +49,49 @@ class MercadoPagoCliente
         return $this->interpretar($respuesta);
     }
 
+    /**
+     * @param  array<string, mixed>  $cuerpo
+     * @return array<string, mixed>
+     *
+     * @throws ErrorMercadoPago
+     */
+    public function crearPreferencia(array $cuerpo, string $claveIdempotencia): array
+    {
+        try {
+            $respuesta = $this->solicitud()
+                ->withHeaders(['X-Idempotency-Key' => $claveIdempotencia])
+                ->post('/checkout/preferences', $cuerpo);
+        } catch (ConnectionException $excepcion) {
+            throw new ErrorMercadoPago('No se pudo conectar con Mercado Pago.', null, $excepcion);
+        }
+
+        return $this->interpretar($respuesta);
+    }
+
+    /**
+     * Operaciones que coinciden con la referencia externa, de la más reciente a la más antigua.
+     *
+     * @return list<array<string, mixed>>
+     *
+     * @throws ErrorMercadoPago
+     */
+    public function buscarPagosPorReferencia(string $referencia): array
+    {
+        try {
+            $respuesta = $this->solicitud()->get('/v1/payments/search', [
+                'external_reference' => $referencia,
+                'sort' => 'date_created',
+                'criteria' => 'desc',
+            ]);
+        } catch (ConnectionException $excepcion) {
+            throw new ErrorMercadoPago('No se pudo conectar con Mercado Pago.', null, $excepcion);
+        }
+
+        $datos = $this->interpretar($respuesta);
+
+        return array_values(array_filter($datos['results'] ?? [], is_array(...)));
+    }
+
     private function solicitud(): PendingRequest
     {
         return Http::baseUrl((string) config('mercadopago.url_api'))

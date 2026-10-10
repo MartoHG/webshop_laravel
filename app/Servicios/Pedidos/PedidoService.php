@@ -224,6 +224,12 @@ class PedidoService
             ]);
         }
 
+        if (Pago::query()->where('pedido_id', $pedido->getKey())->where('estado', EstadoIntentoPago::RequiereRevision->value)->exists()) {
+            throw ValidationException::withMessages([
+                'pedido' => 'No se puede cancelar un pedido con un pago en revisión.',
+            ]);
+        }
+
         if (! $motivo->elegibleManualmente()) {
             throw ValidationException::withMessages([
                 'motivo' => 'El motivo reemplazado lo asigna el sistema y no puede elegirse manualmente.',

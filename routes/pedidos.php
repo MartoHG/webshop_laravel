@@ -15,6 +15,7 @@ Route::middleware(['auth', VerificarUsuarioActivo::class, VerificarRolAdministra
         Route::get('/{pedido}', [PedidoController::class, 'mostrar'])->name('mostrar');
         Route::post('/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->name('cancelar');
         Route::get('/{pedido}/pagos', [PagoController::class, 'index'])->name('pagos');
+        Route::post('/{pedido}/pagos/{pago}/resolver', [PagoController::class, 'resolverRevision'])->name('pagos.resolver');
 
         Route::patch('/{pedido}/contacto', [CoordinacionPedidoController::class, 'actualizarContacto'])->name('contacto');
         Route::patch('/{pedido}/envio/cotizacion', [CoordinacionPedidoController::class, 'cotizarEnvio'])->name('envio.cotizacion');

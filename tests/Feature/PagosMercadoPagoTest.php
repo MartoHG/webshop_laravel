@@ -7,6 +7,7 @@ use App\Enums\EstadoIntentoPago;
 use App\Enums\EstadoPago;
 use App\Enums\EstadoPedido;
 use App\Enums\TipoMedioPago;
+use App\Jobs\ProcesarNotificacionMercadoPago;
 use App\Models\ItemPedido;
 use App\Models\Pago;
 use App\Models\Pedido;
@@ -18,7 +19,9 @@ use App\Servicios\Pagos\MercadoPagoCliente;
 use App\Servicios\Pagos\PagoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class PagosMercadoPagoTest extends TestCase
@@ -28,6 +31,10 @@ class PagosMercadoPagoTest extends TestCase
     private const string URL_PAGOS = 'https://api.mercadopago.com/v1/payments';
 
     private const string TOKEN_ACCESO = 'TEST-token-de-prueba-123456';
+
+    private const string URL_PREFERENCIAS = 'https://api.mercadopago.com/checkout/preferences';
+
+    private const string SECRETO_WEBHOOK = 'secreto-webhook-de-prueba';
 
     protected function setUp(): void
     {
@@ -40,6 +47,7 @@ class PagosMercadoPagoTest extends TestCase
             'mercadopago.public_key' => 'TEST-public-key-123',
             'mercadopago.url_api' => 'https://api.mercadopago.com',
             'mercadopago.descriptor' => 'EL REFUGIO',
+            'mercadopago.webhook_secret' => self::SECRETO_WEBHOOK,
         ]);
     }
 
@@ -564,6 +572,530 @@ class PagosMercadoPagoTest extends TestCase
             ->assertJsonPath('pagos.0.importe_cobrado', '1250.00')
             ->assertJsonPath('pagos.0.porcentaje_aplicado', '20.000000')
             ->assertJsonMissingPath('pagos.0.clave_idempotencia');
+    }
+
+    public function test_monto_como_numero_json_se_valida_sin_perder_centavos(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->intentoCreado($pedido, $this->reglaCredito(3, '20'));
+        $url = "/pago/{$pedido->token_pago}/intentos/{$pago->id}/tarjeta";
+
+        Http::fake([self::URL_PAGOS => Http::response($this->respuestaMp([
+            'status' => 'rejected',
+            'status_detail' => 'cc_rejected_other_reason',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 201)]);
+
+        $this->postJson($url, $this->datosTarjeta(['transaction_amount' => 1250.001]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('transaction_amount');
+
+        $this->postJson($url, $this->datosTarjeta(['transaction_amount' => 1250.5]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('importe');
+
+        $this->postJson($url, $this->datosTarjeta(['transaction_amount' => 1250.0]))
+            ->assertOk()
+            ->assertJsonPath('estado', 'rechazado');
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request['transaction_amount'] === 1250.0);
+    }
+
+    public function test_webhook_con_firma_valida_despacha_el_procesamiento(): void
+    {
+        Queue::fake();
+
+        $this->postJson('/webhooks/mercadopago?data.id=555', $this->cuerpoWebhook('555'), $this->cabecerasWebhook('555'))
+            ->assertOk();
+
+        Queue::assertPushed(
+            ProcesarNotificacionMercadoPago::class,
+            fn (ProcesarNotificacionMercadoPago $job): bool => $job->idPago === '555',
+        );
+        Queue::assertPushedTimes(ProcesarNotificacionMercadoPago::class, 1);
+    }
+
+    public function test_webhook_acepta_data_id_con_guion_bajo_y_normaliza_a_minusculas(): void
+    {
+        Queue::fake();
+
+        $this->postJson('/webhooks/mercadopago?data_id=ABC', $this->cuerpoWebhook('ABC'), $this->cabecerasWebhook('ABC'))
+            ->assertOk();
+
+        Queue::assertPushed(
+            ProcesarNotificacionMercadoPago::class,
+            fn (ProcesarNotificacionMercadoPago $job): bool => $job->idPago === 'abc',
+        );
+    }
+
+    public function test_webhook_con_firma_invalida_o_incompleta_responde_401_sin_hacer_nada(): void
+    {
+        Queue::fake();
+
+        $firmaValida = $this->cabecerasWebhook('555');
+        $casos = [
+            'secreto distinto' => $this->cabecerasWebhook('555', secreto: 'otro-secreto'),
+            'sin x-signature' => array_diff_key($firmaValida, ['x-signature' => true]),
+            'sin x-request-id' => array_diff_key($firmaValida, ['x-request-id' => true]),
+            'firma sin v1' => ['x-signature' => 'ts=1760000000'] + ['x-request-id' => 'req-abc'],
+            'data.id alterado' => $firmaValida,
+        ];
+
+        foreach ($casos as $descripcion => $cabeceras) {
+            $dataId = $descripcion === 'data.id alterado' ? '556' : '555';
+
+            $this->postJson("/webhooks/mercadopago?data.id={$dataId}", $this->cuerpoWebhook($dataId), $cabeceras)
+                ->assertUnauthorized();
+        }
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_webhook_sin_secreto_configurado_responde_401(): void
+    {
+        Queue::fake();
+        config(['mercadopago.webhook_secret' => null]);
+
+        $this->postJson('/webhooks/mercadopago?data.id=555', $this->cuerpoWebhook('555'), $this->cabecerasWebhook('555'))
+            ->assertUnauthorized();
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_webhook_ignora_otros_tipos_de_notificacion(): void
+    {
+        Queue::fake();
+
+        $this->postJson('/webhooks/mercadopago?data.id=555', ['type' => 'merchant_order', 'data' => ['id' => '555']], $this->cabecerasWebhook('555'))
+            ->assertOk()
+            ->assertJsonPath('mensaje', 'Notificación ignorada.');
+
+        Queue::assertNothingPushed();
+    }
+
+    public function test_procesar_notificacion_aprobada_confirma_el_pedido_y_no_duplica_efectos(): void
+    {
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pago = $this->pagoPendiente($pedido);
+
+        Http::fake([self::URL_PAGOS.'/555' => Http::response($this->respuestaMp([
+            'id' => 555,
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 200)]);
+
+        $job = new ProcesarNotificacionMercadoPago('555');
+        $job->handle(app(MercadoPagoCliente::class), app(PagoService::class));
+        $job->handle(app(MercadoPagoCliente::class), app(PagoService::class));
+
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->fresh()->estado_pedido);
+        $this->assertSame(EstadoPago::Pagado, $pedido->fresh()->estado_pago);
+        $this->assertSame(EstadoIntentoPago::Pagado, $pago->fresh()->estado);
+        $this->assertSame(1, RegistroAuditoria::query()->where('accion', 'pedido.pagado')->count());
+        Http::assertSentCount(2);
+    }
+
+    public function test_notificacion_con_consulta_rechazada_no_se_reintenta(): void
+    {
+        Http::fake([self::URL_PAGOS.'/999' => Http::response(['message' => 'not found'], 404)]);
+
+        (new ProcesarNotificacionMercadoPago('999'))->handle(app(MercadoPagoCliente::class), app(PagoService::class));
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_dinero_en_cuenta_crea_preferencia_restringida_y_guarda_su_id(): void
+    {
+        Http::fake([self::URL_PREFERENCIAS => Http::response(['id' => 'pref-123'], 201)]);
+
+        $pedido = $this->pedidoHabilitado();
+        ReglaPrecioPago::factory()->activa()->create([
+            'tipo_medio_pago' => TipoMedioPago::DineroEnCuenta,
+            'cuotas' => 1,
+            'porcentaje' => '4',
+        ]);
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos", ['regla_precio_pago_id' => ReglaPrecioPago::query()->sole()->id])
+            ->assertCreated()
+            ->assertJsonPath('intento.preference_id', 'pref-123')
+            ->assertJsonPath('intento.importe', '1041.67')
+            ->assertJsonPath('intento.tipo_medio_pago', 'dinero_en_cuenta');
+
+        $pago = Pago::query()->sole();
+
+        $this->assertSame('pref-123', $pago->id_orden_mercado_pago);
+
+        Http::assertSent(function (Request $request) use ($pago, $pedido): bool {
+            $metodos = $request['payment_methods'];
+            $excluidos = collect($metodos['excluded_payment_types'])->pluck('id')->sort()->values()->all();
+
+            return $request->url() === self::URL_PREFERENCIAS
+                && $request->hasHeader('X-Idempotency-Key', $pago->clave_idempotencia)
+                && $request['items'][0]['unit_price'] === 1041.67
+                && $request['items'][0]['quantity'] === 1
+                && $request['items'][0]['currency_id'] === 'ARS'
+                && $request['items'][0]['title'] === "Pedido {$pedido->numero} - El Refugio"
+                && $request['external_reference'] === "{$pedido->numero}:{$pago->id}"
+                && $request['notification_url'] === url('/webhooks/mercadopago')
+                && $request['back_urls']['success'] === url("/pago/{$pedido->token_pago}")
+                && $request['auto_return'] === 'approved'
+                && $metodos['installments'] === 1
+                && $excluidos === ['atm', 'bank_transfer', 'credit_card', 'debit_card', 'prepaid_card', 'ticket'];
+        });
+    }
+
+    public function test_error_al_crear_preferencia_cancela_el_intento(): void
+    {
+        Http::fake([self::URL_PREFERENCIAS => Http::response(['message' => 'error'], 500)]);
+
+        $pedido = $this->pedidoHabilitado();
+        $regla = ReglaPrecioPago::factory()->activa()->create([
+            'tipo_medio_pago' => TipoMedioPago::DineroEnCuenta,
+            'cuotas' => 1,
+            'porcentaje' => '4',
+        ]);
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos", ['regla_precio_pago_id' => $regla->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pago');
+
+        $this->assertSame(EstadoIntentoPago::Cancelado, Pago::query()->sole()->estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+    }
+
+    public function test_pagos_conciliar_aplica_pendientes_por_id_y_por_referencia(): void
+    {
+        $porId = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pagoPorId = $this->pagoPendiente($porId);
+        $pagoPorId->update(['id_pago_mercado_pago' => '555']);
+
+        $porReferencia = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pagoPorReferencia = $this->pagoPendiente($porReferencia);
+
+        $fallido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pagoFallido = $this->pagoPendiente($fallido);
+        $pagoFallido->update(['id_pago_mercado_pago' => '557']);
+
+        $reciente = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pagoReciente = $this->pagoPendiente($reciente);
+        $pagoReciente->update(['id_pago_mercado_pago' => '558']);
+
+        DB::table('pagos')
+            ->whereIn('id', [$pagoPorId->id, $pagoPorReferencia->id, $pagoFallido->id])
+            ->update(['updated_at' => now()->subMinutes(30)]);
+
+        Http::fake([
+            self::URL_PAGOS.'/555' => Http::response($this->respuestaMp([
+                'id' => 555,
+                'external_reference' => "{$porId->numero}:{$pagoPorId->id}",
+            ]), 200),
+            self::URL_PAGOS.'/557' => Http::response(['message' => 'error'], 500),
+            self::URL_PAGOS.'/search*' => Http::response(['results' => [$this->respuestaMp([
+                'id' => 556,
+                'external_reference' => "{$porReferencia->numero}:{$pagoPorReferencia->id}",
+            ])]], 200),
+        ]);
+
+        $this->artisan('pagos:conciliar')
+            ->expectsOutputToContain('Pagos conciliados: 2. Con error: 1.')
+            ->assertSuccessful();
+
+        $this->assertSame(EstadoIntentoPago::Pagado, $pagoPorId->fresh()->estado);
+        $this->assertSame(EstadoPedido::Confirmado, $porId->fresh()->estado_pedido);
+        $this->assertSame(EstadoIntentoPago::Pagado, $pagoPorReferencia->fresh()->estado);
+        $this->assertSame('556', $pagoPorReferencia->fresh()->id_pago_mercado_pago);
+        $this->assertSame(EstadoIntentoPago::Pendiente, $pagoFallido->fresh()->estado);
+        $this->assertSame(EstadoIntentoPago::Pendiente, $pagoReciente->fresh()->estado);
+        Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/558'));
+    }
+
+    public function test_admin_acepta_la_revision_y_confirma_el_pedido(): void
+    {
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pago = $this->pagoEnRevision($pedido, '900', 'importe_distinto');
+        $otro = Pago::factory()->for($pedido, 'pedido')->create();
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pago->id}/resolver", [
+                'decision' => 'aceptar',
+                'nota' => 'Confirmado con el cliente por WhatsApp.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('pago.estado', 'pagado');
+
+        $pedido->refresh();
+
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->estado_pedido);
+        $this->assertSame(EstadoPago::Pagado, $pedido->estado_pago);
+        $this->assertNotNull($pedido->pagado_en);
+        $this->assertSame(EstadoIntentoPago::Cancelado, $otro->fresh()->estado);
+
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.revision_resuelta')->sole();
+
+        $this->assertSame($administrador->id, $registro->usuario_id);
+        $this->assertSame('aceptar', $registro->datos_nuevos['decision']);
+        $this->assertSame('Confirmado con el cliente por WhatsApp.', $registro->datos_nuevos['nota']);
+    }
+
+    public function test_admin_descarta_la_revision_y_el_link_vuelve_a_funcionar(): void
+    {
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pago = $this->pagoEnRevision($pedido, '901', 'reembolsado');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pago->id}/resolver", [
+                'decision' => 'descartar',
+                'nota' => 'Devuelto desde Mercado Pago.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('pago.estado', 'cancelado');
+
+        $this->assertSame('descartado_por_administrador', $pago->fresh()->detalle_estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        $this->assertSame(EstadoPedido::PendienteCoordinacion, $pedido->fresh()->estado_pedido);
+
+        $this->getJson("/pago/{$pedido->token_pago}")
+            ->assertOk()
+            ->assertJsonPath('estado_pago', 'habilitado');
+
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.revision_resuelta')->sole();
+
+        $this->assertSame('descartar', $registro->datos_nuevos['decision']);
+        $this->assertSame($administrador->id, $registro->usuario_id);
+    }
+
+    public function test_revision_pendiente_bloquea_nuevos_intentos_y_cancelacion(): void
+    {
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $this->pagoEnRevision($pedido, '902', 'importe_distinto');
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos", ['regla_precio_pago_id' => $this->reglaCredito(1, '10')->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pago');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/cancelar", ['motivo' => 'cliente_desistio'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pedido');
+    }
+
+    public function test_resolver_rechaza_pagos_ajenos_o_que_no_estan_en_revision(): void
+    {
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $ajeno = $this->pedidoHabilitado();
+        $pagoAjeno = $this->pagoEnRevision($ajeno, '903', 'importe_distinto');
+        $pagoCreado = Pago::factory()->for($pedido, 'pedido')->create();
+        $cancelado = $this->pedidoHabilitado(['estado_pedido' => EstadoPedido::Cancelado, 'estado_pago' => EstadoPago::Cancelado]);
+        $pagoCancelado = $this->pagoEnRevision($cancelado, '904', 'importe_distinto');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pagoAjeno->id}/resolver", ['decision' => 'aceptar', 'nota' => 'Nota.'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pago');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pagoCreado->id}/resolver", ['decision' => 'aceptar', 'nota' => 'Nota.'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pago');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$cancelado->id}/pagos/{$pagoCancelado->id}/resolver", ['decision' => 'aceptar', 'nota' => 'Nota.'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('pedido');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pagoCreado->id}/resolver", ['decision' => 'otra', 'nota' => ''])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['decision', 'nota']);
+
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pagoAjeno->fresh()->estado);
+        $this->assertSame(0, RegistroAuditoria::query()->where('accion', 'pago.revision_resuelta')->count());
+    }
+
+    public function test_cliente_no_puede_resolver_revisiones(): void
+    {
+        $cliente = Usuario::factory()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoEnRevision($pedido, '905', 'importe_distinto');
+
+        $this->actingAs($cliente)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pago->id}/resolver", ['decision' => 'aceptar', 'nota' => 'Nota.'])
+            ->assertForbidden();
+
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->fresh()->estado);
+    }
+
+    private function pagoEnRevision(Pedido $pedido, string $idMercadoPago, string $motivo): Pago
+    {
+        return Pago::factory()->for($pedido, 'pedido')->create([
+            'estado' => EstadoIntentoPago::RequiereRevision,
+            'id_pago_mercado_pago' => $idMercadoPago,
+            'medio_pago_mercado_pago' => 'visa',
+            'detalle_estado' => $motivo,
+            'tipo_medio_pago' => TipoMedioPago::Credito,
+            'cuotas' => 3,
+            'importe_base' => '1000.00',
+            'porcentaje_aplicado' => '20.000000',
+            'importe_cobrado' => '1250.00',
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function cuerpoWebhook(string $dataId): array
+    {
+        return ['action' => 'payment.updated', 'type' => 'payment', 'data' => ['id' => $dataId]];
+    }
+
+    /**
+     * Firma igual a la de Mercado Pago: HMAC-SHA256 del manifiesto id, x-request-id y ts.
+     *
+     * @return array<string, string>
+     */
+    private function cabecerasWebhook(string $dataId, string $requestId = 'req-abc', string $secreto = self::SECRETO_WEBHOOK, string $ts = '1760000000'): array
+    {
+        $manifiesto = 'id:'.strtolower($dataId).";request-id:{$requestId};ts:{$ts};";
+
+        return [
+            'x-signature' => "ts={$ts},v1=".hash_hmac('sha256', $manifiesto, $secreto),
+            'x-request-id' => $requestId,
+        ];
+    }
+
+    public function test_conciliacion_cancela_pago_pendiente_sin_pago_en_mercado_pago_despues_de_30_minutos(): void
+    {
+        Http::fake([self::URL_PAGOS.'/search*' => Http::response(['results' => []], 200)]);
+
+        $antiguo = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pagoAntiguo = $this->pagoPendiente($antiguo);
+        $reciente = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pagoReciente = $this->pagoPendiente($reciente);
+
+        DB::table('pagos')->where('id', $pagoAntiguo->id)->update(['updated_at' => now()->subMinutes(31)]);
+        DB::table('pagos')->where('id', $pagoReciente->id)->update(['updated_at' => now()->subMinutes(15)]);
+
+        $this->artisan('pagos:conciliar')
+            ->expectsOutputToContain('Pagos cancelados por no tener pago en Mercado Pago: 1.')
+            ->assertSuccessful();
+
+        $pagoAntiguo->refresh();
+
+        $this->assertSame(EstadoIntentoPago::Cancelado, $pagoAntiguo->estado);
+        $this->assertSame('sin_pago_en_mercado_pago', $pagoAntiguo->detalle_estado);
+        $this->assertSame(EstadoPago::Habilitado, $antiguo->fresh()->estado_pago);
+
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.cancelado_por_conciliacion')->sole();
+
+        $this->assertNull($registro->usuario_id);
+        $this->assertSame($pagoAntiguo->id, $registro->entidad_id);
+
+        // A los 15 minutos todavía se reintenta: el intento sigue pendiente y el pedido también.
+        $this->assertSame(EstadoIntentoPago::Pendiente, $pagoReciente->fresh()->estado);
+        $this->assertSame(EstadoPago::Pendiente, $reciente->fresh()->estado_pago);
+        Http::assertSentCount(2);
+    }
+
+    public function test_cancelacion_por_conciliacion_no_habilita_el_pedido_con_otro_pago_en_curso(): void
+    {
+        Http::fake([self::URL_PAGOS.'/search*' => Http::response(['results' => []], 200)]);
+
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $antiguo = $this->pagoPendiente($pedido);
+        DB::table('pagos')->where('id', $antiguo->id)->update(['updated_at' => now()->subMinutes(31)]);
+        $enCurso = $this->pagoPendiente($pedido);
+        $enCurso->update(['id_pago_mercado_pago' => '560']);
+
+        $this->artisan('pagos:conciliar')->assertSuccessful();
+
+        $this->assertSame(EstadoIntentoPago::Cancelado, $antiguo->fresh()->estado);
+        $this->assertSame(EstadoPago::Pendiente, $pedido->fresh()->estado_pago);
+    }
+
+    public function test_pago_aprobado_tarde_de_un_intento_cancelado_se_acepta_si_el_pedido_sigue_pagable(): void
+    {
+        Http::fake([self::URL_PAGOS.'/search*' => Http::response(['results' => []], 200)]);
+        $servicio = app(PagoService::class);
+
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $cancelado = $this->pagoPendiente($pedido);
+        DB::table('pagos')->where('id', $cancelado->id)->update(['updated_at' => now()->subMinutes(31)]);
+
+        $this->artisan('pagos:conciliar')->assertSuccessful();
+
+        $this->assertSame(EstadoIntentoPago::Cancelado, $cancelado->fresh()->estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+
+        $aceptado = $servicio->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => 701,
+            'external_reference' => "{$pedido->numero}:{$cancelado->id}",
+        ]));
+
+        $this->assertSame(EstadoIntentoPago::Pagado, $aceptado->estado);
+        $this->assertSame('701', $aceptado->id_pago_mercado_pago);
+        $pedido->refresh();
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->estado_pedido);
+        $this->assertSame(EstadoPago::Pagado, $pedido->estado_pago);
+        $this->assertNotNull($pedido->pagado_en);
+
+        // Lo mismo vale para un intento rechazado que Mercado Pago aprueba más tarde.
+        $otro = $this->pedidoHabilitado();
+        $rechazado = Pago::factory()->for($otro, 'pedido')->create([
+            'estado' => EstadoIntentoPago::Rechazado,
+            'tipo_medio_pago' => TipoMedioPago::Credito,
+            'cuotas' => 3,
+            'importe_base' => '1000.00',
+            'porcentaje_aplicado' => '20.000000',
+            'importe_cobrado' => '1250.00',
+        ]);
+
+        $tardio = $servicio->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => 702,
+            'external_reference' => "{$otro->numero}:{$rechazado->id}",
+        ]));
+
+        $this->assertSame(EstadoIntentoPago::Pagado, $tardio->estado);
+        $this->assertSame(EstadoPedido::Confirmado, $otro->fresh()->estado_pedido);
+    }
+
+    public function test_pago_aprobado_tarde_con_pedido_ya_pagado_queda_en_revision(): void
+    {
+        $servicio = app(PagoService::class);
+        $pedido = $this->pedidoHabilitado([
+            'estado_pedido' => EstadoPedido::Confirmado,
+            'estado_pago' => EstadoPago::Pagado,
+            'pagado_en' => now()->subHour(),
+        ]);
+        $confirmado = Pago::factory()->pagado()->for($pedido, 'pedido')->create([
+            'id_pago_mercado_pago' => '555',
+            'tipo_medio_pago' => TipoMedioPago::Credito,
+            'cuotas' => 3,
+            'importe_base' => '1000.00',
+            'porcentaje_aplicado' => '20.000000',
+            'importe_cobrado' => '1250.00',
+        ]);
+        $tardio = Pago::factory()->for($pedido, 'pedido')->create([
+            'estado' => EstadoIntentoPago::Cancelado,
+            'tipo_medio_pago' => TipoMedioPago::Credito,
+            'cuotas' => 3,
+            'importe_base' => '1000.00',
+            'porcentaje_aplicado' => '20.000000',
+            'importe_cobrado' => '1250.00',
+        ]);
+        $pagadoEn = $pedido->fresh()->pagado_en;
+
+        $revisado = $servicio->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => 703,
+            'external_reference' => "{$pedido->numero}:{$tardio->id}",
+        ]));
+
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $revisado->estado);
+        $this->assertSame('pedido_ya_pagado', $revisado->detalle_estado);
+        $this->assertSame(EstadoIntentoPago::Pagado, $confirmado->fresh()->estado);
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->fresh()->estado_pedido);
+        $this->assertEquals($pagadoEn, $pedido->fresh()->pagado_en);
     }
 
     /** @param  array<string, mixed>  $atributos */

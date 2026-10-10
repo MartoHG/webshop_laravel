@@ -10,6 +10,7 @@ use App\Models\ItemPedido;
 use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\ReglaPrecioPago;
+use App\Models\Usuario;
 use App\Servicios\Auditoria\AuditoriaService;
 use App\Servicios\Precios\CompensacionPagoService;
 use Illuminate\Support\Arr;
@@ -36,6 +37,10 @@ class PagoService
     private const string MENSAJE_REVISION = 'Recibimos tu pago y lo estamos revisando. Te contactamos por WhatsApp.';
 
     private const string MENSAJE_SIN_TOKEN = 'El pago con tarjeta no está disponible en este momento. Escribinos por WhatsApp.';
+
+    private const string MENSAJE_PREFERENCIA = 'No pudimos preparar el pago con tu cuenta de Mercado Pago. Intentá de nuevo en unos minutos.';
+
+    private const string MENSAJE_EN_REVISION = 'Hay un pago en revisión para este pedido. Te contactamos por WhatsApp.';
 
     /** @var list<int> Respuestas 4xx que no garantizan que Mercado Pago no haya procesado la operación. */
     private const array ESTADOS_4XX_AMBIGUOS = [408, 409, 425];
@@ -150,13 +155,15 @@ class PagoService
     /**
      * Fija la modalidad elegida: el porcentaje y el importe quedan guardados en el intento.
      *
-     * @return array{pago_id: int, importe: string, tipo_medio_pago: string, cuotas: int, public_key: ?string}
+     * Para dinero en cuenta crea además la preferencia de Mercado Pago, fuera de cualquier transacción.
+     *
+     * @return array{pago_id: int, importe: string, tipo_medio_pago: string, cuotas: int, public_key: ?string, preference_id: ?string}
      *
      * @throws ValidationException
      */
     public function iniciarIntento(Pedido $pedido, int $reglaId): array
     {
-        return DB::transaction(function () use ($pedido, $reglaId): array {
+        $pago = DB::transaction(function () use ($pedido, $reglaId): Pago {
             $pedido = $this->bloquearPedido($pedido);
             $this->exigirPagoHabilitado($pedido);
 
@@ -191,14 +198,170 @@ class PagoService
                 'importe_cobrado' => $importeCobrado,
             ]);
 
-            return [
-                'pago_id' => $pago->getKey(),
-                'importe' => $importeCobrado,
-                'tipo_medio_pago' => $tipo->value,
-                'cuotas' => $regla->cuotas,
-                'public_key' => config('mercadopago.public_key'),
-            ];
+            return $pago;
         });
+
+        $pago->refresh();
+
+        if ($pago->tipo_medio_pago === TipoMedioPago::DineroEnCuenta) {
+            $this->vincularPreferencia($pedido, $pago);
+            $pago->refresh();
+        }
+
+        return [
+            'pago_id' => $pago->getKey(),
+            'importe' => (string) $pago->importe_cobrado,
+            'tipo_medio_pago' => $pago->tipo_medio_pago->value,
+            'cuotas' => $pago->cuotas,
+            'public_key' => config('mercadopago.public_key'),
+            'preference_id' => $pago->id_orden_mercado_pago,
+        ];
+    }
+
+    /**
+     * La preferencia restringe el cobro a dinero en cuenta. El webhook verifica igualmente medio, cuotas e importe.
+     *
+     * @throws ValidationException
+     */
+    private function vincularPreferencia(Pedido $pedido, Pago $pago): void
+    {
+        try {
+            $preferencia = $this->mercadoPago->crearPreferencia(
+                $this->cuerpoDePreferencia($pedido, $pago),
+                $pago->clave_idempotencia,
+            );
+            $idPreferencia = (string) ($preferencia['id'] ?? '');
+
+            if ($idPreferencia === '') {
+                throw new ErrorMercadoPago('Mercado Pago no devolvió el id de la preferencia.');
+            }
+        } catch (ErrorMercadoPago $error) {
+            Log::warning('No se pudo crear la preferencia de cuenta de Mercado Pago.', [
+                'pago_id' => $pago->getKey(),
+                'status' => $error->status,
+            ]);
+
+            $this->cancelarIntentoSinCobro($pedido, $pago);
+
+            throw ValidationException::withMessages(['pago' => self::MENSAJE_PREFERENCIA]);
+        }
+
+        DB::transaction(function () use ($pedido, $pago, $idPreferencia): void {
+            $this->bloquearPedido($pedido);
+            $pagoBloqueado = $this->bloquearPago($pago);
+            $pagoBloqueado->id_orden_mercado_pago = $idPreferencia;
+            $pagoBloqueado->save();
+        });
+    }
+
+    private function cancelarIntentoSinCobro(Pedido $pedido, Pago $pago): void
+    {
+        DB::transaction(function () use ($pedido, $pago): void {
+            $this->bloquearPedido($pedido);
+            $pagoBloqueado = $this->bloquearPago($pago);
+
+            if ($pagoBloqueado->estado !== EstadoIntentoPago::Creado) {
+                return;
+            }
+
+            $pagoBloqueado->estado = EstadoIntentoPago::Cancelado;
+            $pagoBloqueado->detalle_estado = 'sin_preferencia';
+            $pagoBloqueado->save();
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function cuerpoDePreferencia(Pedido $pedido, Pago $pago): array
+    {
+        $urlDelPedido = url('/pago/'.$pedido->token_pago);
+
+        return [
+            'items' => [[
+                'title' => "Pedido {$pedido->numero} - El Refugio",
+                'quantity' => 1,
+                // Único lugar donde el importe pasa a float: la API lo recibe como número en el JSON.
+                'unit_price' => (float) $pago->importe_cobrado,
+                'currency_id' => config('mercadopago.moneda'),
+            ]],
+            'external_reference' => $this->referenciaExterna($pedido, $pago),
+            'notification_url' => url('/webhooks/mercadopago'),
+            'back_urls' => [
+                'success' => $urlDelPedido,
+                'pending' => $urlDelPedido,
+                'failure' => $urlDelPedido,
+            ],
+            'auto_return' => 'approved',
+            'payment_methods' => [
+                'excluded_payment_types' => array_map(
+                    fn (string $tipo): array => ['id' => $tipo],
+                    ['credit_card', 'debit_card', 'ticket', 'atm', 'bank_transfer', 'prepaid_card'],
+                ),
+                'installments' => 1,
+            ],
+            'statement_descriptor' => (string) config('mercadopago.descriptor'),
+        ];
+    }
+
+    private function hayPagoEnRevision(Pedido $pedido): bool
+    {
+        return Pago::query()
+            ->where('pedido_id', $pedido->getKey())
+            ->where('estado', EstadoIntentoPago::RequiereRevision->value)
+            ->exists();
+    }
+
+    private function aceptarRevision(Pedido $pedido, Pago $pago): void
+    {
+        if ($pedido->estado_pedido === EstadoPedido::Cancelado) {
+            throw ValidationException::withMessages(['pedido' => 'No se puede aceptar un pago de un pedido cancelado.']);
+        }
+
+        $otroPagado = Pago::query()
+            ->where('pedido_id', $pedido->getKey())
+            ->where('id', '!=', $pago->getKey())
+            ->where('estado', EstadoIntentoPago::Pagado->value)
+            ->exists();
+
+        if ($otroPagado) {
+            throw ValidationException::withMessages(['pedido' => 'El pedido ya tiene otro pago confirmado.']);
+        }
+
+        $pagadoEn = $pago->pagado_en ?? now();
+
+        $pago->estado = EstadoIntentoPago::Pagado;
+        $pago->detalle_estado = 'aceptado_por_administrador';
+        $pago->pagado_en = $pagadoEn;
+        $pago->save();
+
+        $pedido->estado_pedido = EstadoPedido::Confirmado;
+        $pedido->estado_pago = EstadoPago::Pagado;
+        $pedido->pagado_en = $pagadoEn;
+        $pedido->save();
+
+        Pago::query()
+            ->where('pedido_id', $pedido->getKey())
+            ->where('id', '!=', $pago->getKey())
+            ->whereIn('estado', EstadoIntentoPago::abiertos())
+            ->update(['estado' => EstadoIntentoPago::Cancelado->value, 'updated_at' => now()]);
+    }
+
+    private function descartarRevision(Pedido $pedido, Pago $pago): void
+    {
+        $pago->estado = EstadoIntentoPago::Cancelado;
+        $pago->detalle_estado = 'descartado_por_administrador';
+        $pago->save();
+
+        if (
+            $pedido->estado_pedido !== EstadoPedido::Cancelado
+            && $pedido->estado_pago === EstadoPago::Pendiente
+            && ! $this->hayOtroPagoPendiente($pedido, $pago)
+            && ! $this->hayPagoEnRevision($pedido)
+        ) {
+            $pedido->estado_pago = EstadoPago::Habilitado;
+            $pedido->save();
+        }
     }
 
     /**
@@ -288,23 +451,82 @@ class PagoService
             ->where('pedido_id', $pedido->getKey())
             ->orderByDesc('id')
             ->get()
-            ->map(fn (Pago $pago): array => [
-                'id' => $pago->getKey(),
-                'estado' => $pago->estado->value,
-                'tipo_medio_pago' => $pago->tipo_medio_pago->value,
-                'cuotas' => $pago->cuotas,
-                'importe_base' => $pago->importe_base,
-                'porcentaje_aplicado' => $pago->porcentaje_aplicado,
-                'importe_cobrado' => $pago->importe_cobrado,
-                'id_pago_mercado_pago' => $pago->id_pago_mercado_pago,
-                'id_orden_mercado_pago' => $pago->id_orden_mercado_pago,
-                'medio_pago_mercado_pago' => $pago->medio_pago_mercado_pago,
-                'detalle_estado' => $pago->detalle_estado,
-                'pagado_en' => $pago->pagado_en?->toIso8601String(),
-                'creado_en' => $pago->created_at?->toIso8601String(),
-            ])
+            ->map(fn (Pago $pago): array => $this->representarIntento($pago))
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function representarIntento(Pago $pago): array
+    {
+        return [
+            'id' => $pago->getKey(),
+            'estado' => $pago->estado->value,
+            'tipo_medio_pago' => $pago->tipo_medio_pago->value,
+            'cuotas' => $pago->cuotas,
+            'importe_base' => $pago->importe_base,
+            'porcentaje_aplicado' => $pago->porcentaje_aplicado,
+            'importe_cobrado' => $pago->importe_cobrado,
+            'id_pago_mercado_pago' => $pago->id_pago_mercado_pago,
+            'id_orden_mercado_pago' => $pago->id_orden_mercado_pago,
+            'medio_pago_mercado_pago' => $pago->medio_pago_mercado_pago,
+            'detalle_estado' => $pago->detalle_estado,
+            'pagado_en' => $pago->pagado_en?->toIso8601String(),
+            'creado_en' => $pago->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Resuelve un pago en revisión con una nota obligatoria, que queda en la auditoría.
+     *
+     * Mientras haya un pago en revisión el pedido no admite nuevos intentos de pago ni cancelación. Al ingresar a
+     * revisión el pedido no cambia: si estaba pendiente, sigue pendiente hasta que el administrador lo resuelva aquí.
+     *
+     * - aceptar: confirma el pedido, salvo que esté cancelado o ya tenga otro pago aprobado.
+     * - descartar: usar después de devolver el dinero en Mercado Pago. El intento queda cancelado y, si el pedido
+     *   estaba pendiente sin otro pago en curso ni en revisión, vuelve a habilitado.
+     *
+     * @throws ValidationException
+     */
+    public function resolverRevision(Usuario $administrador, Pedido $pedido, Pago $pago, string $decision, string $nota): Pago
+    {
+        return DB::transaction(function () use ($administrador, $pedido, $pago, $decision, $nota): Pago {
+            $pedido = $this->bloquearPedido($pedido);
+            $pago = $this->bloquearPago($pago);
+
+            if ((int) $pago->pedido_id !== (int) $pedido->getKey()) {
+                throw ValidationException::withMessages(['pago' => 'El pago no corresponde a este pedido.']);
+            }
+
+            if ($pago->estado !== EstadoIntentoPago::RequiereRevision) {
+                throw ValidationException::withMessages(['pago' => 'Solo se resuelven pagos en revisión.']);
+            }
+
+            $anteriores = [
+                'estado' => $pago->estado->value,
+                'detalle_estado' => $pago->detalle_estado,
+                'estado_pedido' => $pedido->estado_pedido->value,
+                'estado_pago' => $pedido->estado_pago->value,
+            ];
+
+            match ($decision) {
+                'aceptar' => $this->aceptarRevision($pedido, $pago),
+                'descartar' => $this->descartarRevision($pedido, $pago),
+                default => throw ValidationException::withMessages(['decision' => 'La decisión no es válida.']),
+            };
+
+            $this->auditoria->registrar('pago.revision_resuelta', $pago, $anteriores, [
+                'decision' => $decision,
+                'nota' => $nota,
+                'estado' => $pago->estado->value,
+                'estado_pedido' => $pedido->estado_pedido->value,
+                'estado_pago' => $pedido->estado_pago->value,
+            ], $administrador);
+
+            return $pago;
+        });
     }
 
     /**
@@ -343,6 +565,10 @@ class PagoService
     {
         if ($pedido->estado_pago === EstadoPago::Pendiente) {
             throw ValidationException::withMessages(['pago' => self::MENSAJE_EN_PROCESO]);
+        }
+
+        if ($this->hayPagoEnRevision($pedido)) {
+            throw ValidationException::withMessages(['pago' => self::MENSAJE_EN_REVISION]);
         }
 
         if ($pedido->estado_pedido !== EstadoPedido::PendienteCoordinacion || $pedido->estado_pago !== EstadoPago::Habilitado) {
@@ -506,6 +732,43 @@ class PagoService
         ]);
     }
 
+    /**
+     * Cierra un intento pendiente que Mercado Pago nunca registró: sin id y sin operaciones con su referencia.
+     * Si el pedido no tiene otro pago en curso ni en revisión, vuelve a habilitado para que el link funcione de nuevo.
+     * Si Mercado Pago informa el pago más tarde, aplicarPagoMercadoPago lo trata como una aprobación tardía.
+     */
+    public function cancelarSinPagoEnMercadoPago(Pago $pago): bool
+    {
+        return DB::transaction(function () use ($pago): bool {
+            $pedido = Pedido::query()->lockForUpdate()->findOrFail($pago->pedido_id);
+            $pagoBloqueado = $this->bloquearPago($pago);
+
+            if ($pagoBloqueado->estado !== EstadoIntentoPago::Pendiente || $pagoBloqueado->id_pago_mercado_pago !== null) {
+                return false;
+            }
+
+            $pagoBloqueado->estado = EstadoIntentoPago::Cancelado;
+            $pagoBloqueado->detalle_estado = 'sin_pago_en_mercado_pago';
+            $pagoBloqueado->save();
+
+            if (
+                $pedido->estado_pago === EstadoPago::Pendiente
+                && ! $this->hayOtroPagoPendiente($pedido, $pagoBloqueado)
+                && ! $this->hayPagoEnRevision($pedido)
+            ) {
+                $pedido->estado_pago = EstadoPago::Habilitado;
+                $pedido->save();
+            }
+
+            $this->auditoria->registrar('pago.cancelado_por_conciliacion', $pagoBloqueado, ['estado' => EstadoIntentoPago::Pendiente->value], [
+                'estado' => EstadoIntentoPago::Cancelado->value,
+                'motivo' => 'sin_pago_en_mercado_pago',
+            ]);
+
+            return true;
+        });
+    }
+
     private function hayOtroPagoPendiente(Pedido $pedido, Pago $pago): bool
     {
         return Pago::query()
@@ -593,6 +856,10 @@ class PagoService
             return 'pedido_ya_pagado';
         }
 
+        if ($pedido->estado_pedido !== EstadoPedido::PendienteCoordinacion || ! in_array($pedido->estado_pago, [EstadoPago::Habilitado, EstadoPago::Pendiente], true)) {
+            return 'pedido_no_pagable';
+        }
+
         if (($pagoMp['currency_id'] ?? null) !== config('mercadopago.moneda')) {
             return 'moneda_distinta';
         }
@@ -670,7 +937,8 @@ class PagoService
     }
 
     /**
-     * El pedido no cambia: la devolución o el ajuste se resuelven manualmente.
+     * El pedido no cambia: si estaba pendiente, queda pendiente y bloquea nuevos intentos hasta que el
+     * administrador resuelva la revisión (ver resolverRevision).
      *
      * @param  array<string, mixed>  $pagoMp
      */

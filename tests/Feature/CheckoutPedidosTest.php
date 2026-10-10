@@ -266,8 +266,8 @@ class CheckoutPedidosTest extends TestCase
     {
         $cliente = Usuario::factory()->create();
         $otro = Usuario::factory()->create();
-        $propio = Pedido::factory()->conTokenPago()->create(['usuario_id' => $cliente->id]);
-        $ajeno = Pedido::factory()->conTokenPago()->create(['usuario_id' => $otro->id]);
+        $propio = Pedido::factory()->conTokenPago()->create(['usuario_id' => $cliente->id, 'numero' => 'ER-2026-000201']);
+        $ajeno = Pedido::factory()->conTokenPago()->create(['usuario_id' => $otro->id, 'numero' => 'ER-2026-000202']);
         $tokenPropio = $propio->token_pago;
 
         $this->actingAs($cliente)->getJson('/cuenta/pedidos')
@@ -289,7 +289,9 @@ class CheckoutPedidosTest extends TestCase
     public function test_administrador_lista_filtra_y_busca_pedidos(): void
     {
         $administrador = Usuario::factory()->administrador()->create();
+        // Datos fijos y distintos: la búsqueda solo puede coincidir con la fila buscada, nunca con datos aleatorios.
         $pendiente = Pedido::factory()->create([
+            'numero' => 'ER-2026-000101',
             'apellido_cliente' => 'Gómez',
             'dni_cliente' => '30123456',
             'email_cliente' => 'ana@example.com',
@@ -297,10 +299,19 @@ class CheckoutPedidosTest extends TestCase
             'created_at' => now()->subDays(5),
         ]);
         $pagado = Pedido::factory()->pagado()->create([
+            'numero' => 'ER-2026-000102',
+            'apellido_cliente' => 'Pérez',
+            'dni_cliente' => '40111222',
             'email_cliente' => 'luis@example.com',
             'created_at' => now()->subDay(),
         ]);
-        $cancelado = Pedido::factory()->cancelado()->create(['created_at' => now()]);
+        $cancelado = Pedido::factory()->cancelado()->create([
+            'numero' => 'ER-2026-000103',
+            'apellido_cliente' => 'Fernández',
+            'dni_cliente' => '40333444',
+            'email_cliente' => 'marta@example.com',
+            'created_at' => now(),
+        ]);
         $item = ItemPedido::factory()->for($pagado, 'pedido')->create(['cantidad' => 2]);
 
         $this->actingAs($administrador)->getJson('/administracion/pedidos')

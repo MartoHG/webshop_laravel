@@ -10,6 +10,18 @@ use Illuminate\Validation\Rule;
  */
 class ProcesarPagoTarjetaRequest extends FormRequest
 {
+    /**
+     * El Brick envía el importe como número JSON: se pasa a texto con su forma más corta, sin float en la comparación.
+     */
+    protected function prepareForValidation(): void
+    {
+        $importe = $this->input('transaction_amount');
+
+        if (is_int($importe) || is_float($importe)) {
+            $this->merge(['transaction_amount' => json_encode($importe)]);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -39,7 +51,7 @@ class ProcesarPagoTarjetaRequest extends FormRequest
         return [
             'metodo_seleccionado.in' => 'El medio de pago no es válido.',
             'installments.between' => 'La cantidad de cuotas debe estar entre 1 y 24.',
-            'transaction_amount.regex' => 'El importe no es válido.',
+            'transaction_amount.regex' => 'El importe debe tener hasta dos decimales.',
             'payer.email.email' => 'Ingresá un email válido.',
             'payer.identification.number.regex' => 'El número de documento no es válido.',
         ];
