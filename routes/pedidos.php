@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Administracion\CoordinacionPedidoController;
 use App\Http\Controllers\Administracion\EdicionPedidoController;
+use App\Http\Controllers\Administracion\EmailPedidoController;
 use App\Http\Controllers\Administracion\PagoController;
 use App\Http\Controllers\Administracion\PedidoController;
 use App\Http\Middleware\VerificarRolAdministrador;
@@ -32,4 +33,7 @@ Route::middleware(['auth', VerificarUsuarioActivo::class, VerificarRolAdministra
         Route::get('/{pedido}/whatsapp/{tipo}', [CoordinacionPedidoController::class, 'whatsapp'])
             ->whereIn('tipo', ['coordinar-envio', 'link-pago'])
             ->name('whatsapp');
+        Route::post('/{pedido}/emails/{tipo}', [EmailPedidoController::class, 'enviar'])
+            ->whereIn('tipo', ['no-contactado', 'recordatorio', 'despachado'])
+            ->name('emails.enviar');
     });

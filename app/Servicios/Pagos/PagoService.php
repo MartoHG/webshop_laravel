@@ -11,12 +11,15 @@ use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\ReglaPrecioPago;
 use App\Models\Usuario;
+use App\Notifications\Pedidos\AlertaPagoEnRevision;
+use App\Notifications\Pedidos\PagoAprobado;
 use App\Servicios\Auditoria\AuditoriaService;
 use App\Servicios\Precios\CompensacionPagoService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -329,6 +332,7 @@ class PagoService
         }
 
         $pagadoEn = $pago->pagado_en ?? now();
+        $yaPagado = $pedido->estado_pago === EstadoPago::Pagado;
 
         $pago->estado = EstadoIntentoPago::Pagado;
         $pago->detalle_estado = 'aceptado_por_administrador';
@@ -345,6 +349,10 @@ class PagoService
             ->where('id', '!=', $pago->getKey())
             ->whereIn('estado', EstadoIntentoPago::abiertos())
             ->update(['estado' => EstadoIntentoPago::Cancelado->value, 'updated_at' => now()]);
+
+        if (! $yaPagado) {
+            $this->notificarPagoAprobado($pedido, $pago);
+        }
     }
 
     private function descartarRevision(Pedido $pedido, Pago $pago): void
@@ -832,6 +840,8 @@ class PagoService
             'pago_id' => $pago->getKey(),
         ]);
 
+        $this->notificarPagoAprobado($pedido, $pago);
+
         return $pago;
     }
 
@@ -967,7 +977,26 @@ class PagoService
             'estado_mercado_pago' => $pagoMp['status'] ?? null,
         ]);
 
+        if ($anterior !== EstadoIntentoPago::RequiereRevision->value) {
+            $this->alertarPagoEnRevision($pago);
+        }
+
         return $pago;
+    }
+
+    private function notificarPagoAprobado(Pedido $pedido, Pago $pago): void
+    {
+        Notification::route('mail', $pedido->email_cliente)->notify(new PagoAprobado($pedido, $pago));
+    }
+
+    private function alertarPagoEnRevision(Pago $pago): void
+    {
+        $administradores = Usuario::query()
+            ->where('rol', 'administrador')
+            ->where('activo', true)
+            ->get();
+
+        Notification::send($administradores, new AlertaPagoEnRevision($pago->pedido, $pago));
     }
 
     /**

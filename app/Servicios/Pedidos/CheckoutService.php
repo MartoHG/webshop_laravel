@@ -10,11 +10,13 @@ use App\Models\Pedido;
 use App\Models\Producto;
 use App\Models\Usuario;
 use App\Models\VarianteProducto;
+use App\Notifications\Pedidos\PedidoCreado;
 use App\Servicios\Carrito\CarritoService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 class CheckoutService
@@ -139,7 +141,11 @@ class CheckoutService
             ]);
         }
 
-        return ['pedido' => $pedido->load('items'), 'creado' => true];
+        $pedido->load('items');
+
+        Notification::route('mail', $pedido->email_cliente)->notify(new PedidoCreado($pedido));
+
+        return ['pedido' => $pedido, 'creado' => true];
     }
 
     /**
