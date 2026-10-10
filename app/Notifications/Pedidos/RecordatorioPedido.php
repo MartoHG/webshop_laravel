@@ -4,6 +4,7 @@ namespace App\Notifications\Pedidos;
 
 use App\Enums\EstadoPago;
 use App\Models\Pedido;
+use App\Servicios\Precios\FormatoMoneda;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class RecordatorioPedido extends NotificacionPedido
@@ -18,7 +19,7 @@ class RecordatorioPedido extends NotificacionPedido
         );
 
         if ($this->pedido->estado_pago === EstadoPago::Habilitado) {
-            $mail->line('Tu pedido '.$this->pedido->numero.' ya está listo para pagar. El total con envío es '.$this->importe((string) $this->pedido->total_base).'.')
+            $mail->line('Tu pedido '.$this->pedido->numero.' ya está listo para pagar. El total con envío es '.FormatoMoneda::formatear((string) $this->pedido->total_base).'.')
                 ->line('Podés pagarlo desde el botón de abajo cuando quieras.');
 
             $this->agregarMensajeDelAdministrador($mail, $this->mensaje);

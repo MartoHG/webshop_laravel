@@ -40,16 +40,6 @@ abstract class NotificacionPedido extends Notification implements ShouldQueue
         return preg_replace('/([\\\\`*_\[\]()<>#!~|&])/', '\\\\$1', $texto) ?? $texto;
     }
 
-    /**
-     * Formatea un importe como "$1.250,00" sin pasar el valor por flotantes.
-     */
-    protected function importe(string $importe): string
-    {
-        [$entero, $decimales] = array_pad(explode('.', $importe, 2), 2, '00');
-
-        return '$'.preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $entero).','.str_pad($decimales, 2, '0');
-    }
-
     protected function agregarMensajeDelAdministrador(MailMessage $mail, ?string $mensaje): void
     {
         if ($mensaje !== null) {

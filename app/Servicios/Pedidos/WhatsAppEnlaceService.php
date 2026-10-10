@@ -5,6 +5,7 @@ namespace App\Servicios\Pedidos;
 use App\Enums\EstadoPago;
 use App\Enums\EstadoPedido;
 use App\Models\Pedido;
+use App\Servicios\Precios\FormatoMoneda;
 use Illuminate\Validation\ValidationException;
 
 class WhatsAppEnlaceService
@@ -95,10 +96,10 @@ class WhatsAppEnlaceService
         }
 
         $mensaje = sprintf(
-            'Hola %s, ya podés pagar tu pedido %s. Total con envío: $%s. Pagá desde este link: %s',
+            'Hola %s, ya podés pagar tu pedido %s. Total con envío: %s. Pagá desde este link: %s',
             $pedido->nombre_cliente,
             $pedido->numero,
-            $this->formatearImporte((string) $pedido->total_base),
+            FormatoMoneda::formatear((string) $pedido->total_base),
             url('/pago/'.$pedido->token_pago),
         );
 
@@ -124,15 +125,5 @@ class WhatsAppEnlaceService
             'telefono_normalizado' => $normalizado,
             'mensaje' => $mensaje,
         ];
-    }
-
-    /**
-     * Separa miles con punto y decimales con coma, sin pasar el importe por flotantes.
-     */
-    private function formatearImporte(string $importe): string
-    {
-        [$entero, $decimales] = array_pad(explode('.', $importe, 2), 2, '00');
-
-        return preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $entero).','.str_pad($decimales, 2, '0');
     }
 }

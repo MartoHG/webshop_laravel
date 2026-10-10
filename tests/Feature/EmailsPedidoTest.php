@@ -239,7 +239,7 @@ class EmailsPedidoTest extends TestCase
         $this->assertSame(url('/pago/'.$token), $mail->actionUrl);
         $this->assertSame('Pagar mi pedido', $mail->actionText);
         $this->assertStringContainsString(url('/pago/'.$token), $html);
-        $this->assertStringContainsString('$1.000,00', $html);
+        $this->assertStringContainsString('El total con envío es $1.000.', $html);
         $this->assertStringContainsString($pedido->numero, $html);
     }
 

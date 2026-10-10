@@ -3,6 +3,7 @@
 namespace App\Notifications\Pedidos;
 
 use App\Models\Pedido;
+use App\Servicios\Precios\FormatoMoneda;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class PedidoCreado extends NotificacionPedido
@@ -25,7 +26,7 @@ class PedidoCreado extends NotificacionPedido
         }
 
         return $mail
-            ->line('Subtotal de productos: '.$this->importe((string) $this->pedido->subtotal_productos).'.')
+            ->line('Subtotal de productos: '.FormatoMoneda::formatear((string) $this->pedido->subtotal_productos).'.')
             ->line('El envío se cotiza aparte: te escribimos por WhatsApp al '.$this->pedido->telefono_cliente.' para acordarlo. Todavía no pagaste nada.')
             ->action('Ver mi pedido', url('/cuenta/pedidos/'.$this->pedido->numero));
     }
