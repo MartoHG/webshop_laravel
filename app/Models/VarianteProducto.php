@@ -33,4 +33,20 @@ class VarianteProducto extends Model
     {
         return $this->hasMany(ImagenProducto::class);
     }
+
+    /**
+     * Regla de venta compartida por el carrito y la edición de pedidos. Null cuando la variante se puede vender.
+     */
+    public function motivoNoDisponible(): ?string
+    {
+        if (! $this->activo || ! $this->producto->activo) {
+            return 'no_disponible';
+        }
+
+        if (! $this->disponible || ! $this->producto->disponible) {
+            return 'agotado';
+        }
+
+        return null;
+    }
 }

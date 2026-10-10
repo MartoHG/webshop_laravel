@@ -122,7 +122,7 @@ class CheckoutService
             'huella_checkout' => $huella,
         ]);
 
-        $pedido->numero = sprintf('ER-%s-%06d', $pedido->created_at->year, $pedido->getKey());
+        $pedido->numero = $pedido->generarNumero();
         $pedido->save();
 
         foreach ($carrito['items'] as $item) {

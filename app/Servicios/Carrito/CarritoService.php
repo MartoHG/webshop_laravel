@@ -201,15 +201,7 @@ class CarritoService
 
     private function motivoNoDisponible(?VarianteProducto $variante): ?string
     {
-        if ($variante === null || ! $variante->activo || ! $variante->producto->activo) {
-            return 'no_disponible';
-        }
-
-        if (! $variante->disponible || ! $variante->producto->disponible) {
-            return 'agotado';
-        }
-
-        return null;
+        return $variante === null ? 'no_disponible' : $variante->motivoNoDisponible();
     }
 
     /**

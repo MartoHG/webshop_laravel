@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pedido extends Model
 {
@@ -99,8 +100,24 @@ class Pedido extends Model
         return $this->belongsTo(Pedido::class, 'pedido_origen_id');
     }
 
+    /**
+     * Pedido que reemplazó a este (sección 32). Un pedido se reemplaza una sola vez.
+     */
+    public function reemplazadoPor(): HasOne
+    {
+        return $this->hasOne(Pedido::class, 'pedido_origen_id');
+    }
+
     public function canceladoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'cancelado_por');
+    }
+
+    /**
+     * Número visible (ER-AAAA-000123). Solo se puede calcular después del insert, cuando el pedido ya tiene id.
+     */
+    public function generarNumero(): string
+    {
+        return sprintf('ER-%s-%06d', $this->created_at->year, $this->getKey());
     }
 }

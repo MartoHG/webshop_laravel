@@ -34,7 +34,7 @@ class PedidoService
     {
         return Pedido::query()
             ->where('usuario_id', $usuario->getKey())
-            ->with('items')
+            ->with(['items', 'pedidoOrigen', 'reemplazadoPor'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(self::POR_PAGINA_CLIENTE);
@@ -45,7 +45,7 @@ class PedidoService
         return Pedido::query()
             ->where('usuario_id', $usuario->getKey())
             ->where('numero', $numero)
-            ->with('items')
+            ->with(['items', 'pedidoOrigen', 'reemplazadoPor'])
             ->firstOrFail();
     }
 
@@ -56,7 +56,7 @@ class PedidoService
     public function listarParaAdministracion(array $filtros): LengthAwarePaginator
     {
         return Pedido::query()
-            ->with(['items', 'canceladoPor'])
+            ->with(['items', 'canceladoPor', 'pedidoOrigen', 'reemplazadoPor'])
             ->when($filtros['estado_pedido'] ?? null, fn (Builder $consulta, string $estado): Builder => $consulta->where('estado_pedido', $estado))
             ->when($filtros['estado_contacto'] ?? null, fn (Builder $consulta, string $estado): Builder => $consulta->where('estado_contacto', $estado))
             ->when($filtros['estado_envio'] ?? null, fn (Builder $consulta, string $estado): Builder => $consulta->where('estado_envio', $estado))
@@ -71,7 +71,7 @@ class PedidoService
 
     public function mostrarParaAdministracion(Pedido $pedido): Pedido
     {
-        return $pedido->load(['items', 'canceladoPor']);
+        return $pedido->load(['items', 'canceladoPor', 'pedidoOrigen', 'reemplazadoPor']);
     }
 
     /**
@@ -127,6 +127,8 @@ class PedidoService
     {
         return [
             'numero' => $pedido->numero,
+            'reemplaza_a' => $pedido->pedidoOrigen?->numero,
+            'reemplazado_por' => $pedido->reemplazadoPor?->numero,
             'estado_pedido' => $pedido->estado_pedido->value,
             'estado_envio' => $pedido->estado_envio->value,
             'estado_pago' => $pedido->estado_pago->value,
@@ -159,6 +161,8 @@ class PedidoService
             'numero' => $pedido->numero,
             'usuario_id' => $pedido->usuario_id,
             'pedido_origen_id' => $pedido->pedido_origen_id,
+            'reemplaza_a' => $pedido->pedidoOrigen?->numero,
+            'reemplazado_por' => $pedido->reemplazadoPor?->numero,
             'estado_pedido' => $pedido->estado_pedido->value,
             'estado_contacto' => $pedido->estado_contacto->value,
             'estado_envio' => $pedido->estado_envio->value,
@@ -191,6 +195,7 @@ class PedidoService
             ],
             'envio' => $this->envioDe($pedido),
             'items' => $pedido->items->map(fn (ItemPedido $item): array => [
+                'id' => $item->id,
                 'producto_id' => $item->producto_id,
                 'variante_producto_id' => $item->variante_producto_id,
                 ...$this->representarItem($item),
