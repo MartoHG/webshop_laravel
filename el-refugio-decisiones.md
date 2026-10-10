@@ -1201,6 +1201,8 @@ cliente paga
 - El webhook se valida con la firma de Mercado Pago. Después, el backend vuelve a consultar el pago en la API de Mercado Pago y verifica la referencia del pedido, el importe, la moneda, el medio y las cuotas.
 - Recibir varias veces la misma notificación no repite efectos.
 - Un pago aprobado nunca se rechaza ni se ignora. Si llega para un pedido cancelado o reemplazado, o si el pedido ya tenía otro pago aprobado, el intento queda en `requiere_revision`, el pedido no cambia y se avisa al administrador. La devolución, si corresponde, se hace manualmente desde Mercado Pago.
+- Mientras haya un pago en revisión, el pedido no admite nuevos intentos de pago ni cancelación. El administrador lo resuelve desde el panel con una nota obligatoria: **aceptar** el pago (el pedido pasa a pagado, si no está cancelado ni tiene otro pago aprobado) o **descartarlo** después de devolver la plata en Mercado Pago (el link de pago vuelve a funcionar). Ambas decisiones quedan auditadas.
+- Un proceso automático revisa cada 15 minutos los pagos que siguen pendientes (por ejemplo, por un corte de conexión) y les aplica el estado que informa Mercado Pago.
 
 ---
 
