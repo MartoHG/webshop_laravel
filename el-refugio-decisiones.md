@@ -533,6 +533,8 @@ porcentaje configurado: 20%
 
 El Service de pricing será responsable del cálculo.
 
+El importe a cobrar se redondea **hacia arriba** al centavo, para que el negocio nunca reciba menos que `total_base`.
+
 ---
 
 # 19. Reglas de pricing de pagos
@@ -557,6 +559,20 @@ reglas_precio_pago
 - Guardar en cada intento de pago el porcentaje efectivamente utilizado.
 - Las reglas actuales no deben alterar pagos históricos.
 - El sistema debe permitir desactivar modalidades/cuotas que el negocio no quiera aceptar.
+- Cada combinación de `tipo_medio_pago` y `cuotas` es única.
+- El porcentaje debe ser mayor o igual a 0 y menor a 100.
+
+## Medios de pago aceptados en V1
+
+```text
+credito            → tarjeta de crédito, en 1 o más cuotas
+debito             → tarjeta de débito, 1 pago
+dinero_en_cuenta   → saldo de la cuenta de Mercado Pago, 1 pago
+```
+
+No se acepta efectivo (Rapipago/Pago Fácil) en V1.
+
+Una modalidad solo se ofrece al cliente si tiene una regla activa. Las reglas iniciales se crean inactivas: el dueño debe cargar los porcentajes antes de la primera venta.
 
 ---
 
@@ -589,6 +605,10 @@ La operación debe ejecutarse dentro de una transacción.
 
 Debe existir historial/auditoría de cambios masivos.
 
+- La actualización alcanza también a las variantes inactivas incluidas en el filtro.
+- Si algún precio resultante quedara en $0 o menos, se rechaza el lote completo y no se modifica nada.
+- Se aplica exactamente lo que se previsualizó: si los precios o el conjunto afectado cambiaron desde la vista previa, se rechaza y hay que volver a previsualizar.
+
 ---
 
 # 21. Carrito
@@ -607,11 +627,15 @@ Para V1 puede mantenerse en sesión.
 
 ## Reglas
 
-- Cantidad mínima: 1.
+- Cantidad mínima: 1. Cantidad máxima: 99 por línea.
+- Agregar una variante que ya está en el carrito suma la cantidad en la misma línea.
+- El carrito puede usarse sin iniciar sesión. Al iniciar sesión o registrarse, el carrito se conserva.
+- La cuenta y el email verificado se exigen recién al confirmar el checkout.
 - Revalidar precio y disponibilidad antes de confirmar checkout.
 - El carrito no es fuente definitiva de precio.
 - Si una variante deja de estar disponible, no se elimina silenciosamente.
 - Debe mostrarse como agotada/no disponible y bloquear la continuación hasta resolverlo.
+- Una variante o producto desactivado se trata igual que uno agotado: se muestra como no disponible y bloquea la continuación.
 
 ---
 
@@ -709,6 +733,8 @@ Ejemplo de acción:
 ```
 
 El botón abre WhatsApp con un mensaje ya preparado para que el administrador lo revise y envíe.
+
+Los enlaces usan el formato `https://wa.me/<número>?text=<mensaje>`. El teléfono guardado se normaliza en lo posible al formato internacional argentino (`549` + código de área + número, sin `0` ni `15`). Si no se puede normalizar, no se rechaza: el administrador ve el número tal como lo cargó el cliente.
 
 También existirá:
 
@@ -821,6 +847,19 @@ rechazado
 cancelado
 ```
 
+`estado_pago` del pedido usa `deshabilitado`, `habilitado`, `pendiente`, `pagado` y `cancelado`. Un intento rechazado no deja el pedido en `rechazado`: vuelve a `habilitado` para que el cliente pueda reintentar.
+
+Cada intento de pago (tabla `pagos`) tiene su propio estado:
+
+```text
+creado
+pendiente
+pagado
+rechazado
+cancelado
+requiere_revision
+```
+
 ## Envío
 
 ```text
@@ -851,10 +890,12 @@ Cliente responde
 Administrador obtiene costo del expreso
 → envío = cotizado
 
-Cliente acepta
+Cliente acepta por WhatsApp
+→ el administrador lo registra
 → envío = aceptado
 
 Administrador habilita pago
+→ se genera la orden de pago y su link
 → pago = habilitado
 
 Cliente paga
@@ -894,6 +935,10 @@ Ejemplos de motivo:
 - problema logístico;
 - otro.
 
+El motivo `reemplazado` lo asigna el sistema al reemplazar un pedido (sección 32); el administrador no lo elige manualmente.
+
+No se puede cancelar un pedido mientras tenga un intento de pago `pendiente` en Mercado Pago.
+
 Los inconvenientes posteriores a un pago confirmado se conversarán y resolverán por WhatsApp. La V1 no gestionará desde la página la cancelación de pedidos pagados ni las devoluciones de dinero.
 
 ---
@@ -910,7 +955,18 @@ Antes de generar la orden de pago, el administrador puede:
 
 El costo del envío se acuerda previamente por WhatsApp. Al finalizar esa coordinación se genera y envía la orden de pago.
 
+**Habilitar el pago y generar la orden de pago son el mismo acto**: crea el link de pago y bloquea la edición del pedido.
+
+Los precios del pedido son un snapshot. Si cambian los precios base o el ajuste e-commerce, los pedidos abiertos no se recalculan solos: el administrador puede usar la acción "recalcular importes", disponible solo antes de habilitar el pago.
+
 Si después de generar la orden de pago hay que modificar productos, cantidades, precios o envío, se cancela esa orden de pago y se genera un pedido nuevo. No se modifica el pedido vinculado a una orden de pago vigente.
+
+Al reemplazar un pedido:
+
+- el pedido original pasa a `cancelado` con motivo `reemplazado`;
+- sus intentos de pago no pagados se cancelan y su link de pago deja de funcionar;
+- el pedido nuevo copia los datos del cliente, el envío y los items, recibe un número nuevo y referencia al original en `pedido_origen_id`;
+- el pedido nuevo nace con el pago `deshabilitado`, para que el administrador lo edite y vuelva a habilitar el pago.
 
 Una vez que Mercado Pago confirme el pago:
 
@@ -927,6 +983,8 @@ No se podrán modificar:
 
 El bloqueo debe estar aplicado en backend, no solo en UI.
 
+Después del pago, el administrador sí puede corregir la dirección y las observaciones de envío, el estado de contacto y el avance del envío. Esas correcciones quedan auditadas.
+
 ---
 
 # 33. Datos del pedido
@@ -939,6 +997,8 @@ pedidos
 id
 numero
 usuario_id
+pedido_origen_id nullable
+token_pago nullable
 
 nombre_cliente
 apellido_cliente
@@ -980,6 +1040,10 @@ updated_at
 ```
 
 `total_base` es la suma de `subtotal_productos` y `costo_envio` acordado. Es el importe objetivo usado para calcular el cobro según la modalidad/cuotas elegida.
+
+- `numero` tiene el formato `ER-AAAA-000123` (año de creación e id con ceros a la izquierda). Es único y nunca se reutiliza.
+- `pedido_origen_id` apunta al pedido reemplazado, cuando corresponde (sección 32).
+- `token_pago` es un valor aleatorio, único e imposible de adivinar que identifica el link de pago (sección 35).
 
 ---
 
@@ -1028,7 +1092,36 @@ La integración debe contemplar:
 - validación server-side;
 - bloqueo de pedido al confirmar pago.
 
-La integración exacta de Checkout Pro vs Checkout API/Bricks deberá resolverse durante la implementación técnica, priorizando la alternativa que permita conocer/controlar modalidad de pago y cuotas antes de cerrar el importe.
+## Integración elegida: Checkout Bricks
+
+Se usa **Checkout Bricks** dentro de la tienda, con la API de pagos de Mercado Pago llamada desde el backend. Checkout Pro queda descartado porque solo permite limitar el máximo de cuotas: el cliente podría elegir menos cuotas y pagar un importe calculado para más.
+
+Flujo:
+
+```text
+link de pago (/pago/{token_pago})
+→ el cliente ve las modalidades con regla activa y el importe de cada una
+→ elige modalidad y cuotas
+→ el backend crea el intento de pago con el porcentaje y el importe fijados
+→ el Brick se muestra con ese importe y solo esas cuotas
+→ el backend valida que el medio y las cuotas recibidos coincidan con el intento
+→ el backend crea el pago en Mercado Pago con clave de idempotencia
+→ el webhook confirma el resultado
+```
+
+- Si el medio de pago o las cuotas recibidos no coinciden con el intento, se rechaza sin llamar a Mercado Pago.
+- El pago con dinero en cuenta usa una preferencia restringida a ese medio y a 1 pago; el webhook verifica igualmente medio, cuotas e importe.
+- La integración usa el cliente HTTP de Laravel, para poder simular Mercado Pago en los tests.
+
+## Link de pago
+
+- El link no exige iniciar sesión: el `token_pago` aleatorio funciona como credencial.
+- La página muestra solo el número de pedido, el detalle de productos, el envío, el total y las modalidades de pago. No muestra DNI, email ni dirección.
+- El link funciona solo mientras el pago del pedido esté `habilitado` o `pendiente`. Deja de funcionar cuando el pedido se paga, se cancela o se reemplaza.
+
+## Configuración de la cuenta de Mercado Pago
+
+El cálculo de la sección 18 supone que el negocio absorbe el costo de las cuotas y lo compensa en el precio. Antes de producción, verificar que la cuenta de Mercado Pago no le cobre además interés al comprador por las cuotas ofrecidas; si lo hiciera, el comprador pagaría el costo dos veces.
 
 ---
 
@@ -1096,6 +1189,10 @@ cliente paga
 → marcar pedido como confirmado
 → bloquear edición del pedido
 ```
+
+- El webhook se valida con la firma de Mercado Pago. Después, el backend vuelve a consultar el pago en la API de Mercado Pago y verifica la referencia del pedido, el importe, la moneda, el medio y las cuotas.
+- Recibir varias veces la misma notificación no repite efectos.
+- Un pago aprobado nunca se rechaza ni se ignora. Si llega para un pedido cancelado o reemplazado, o si el pedido ya tenía otro pago aprobado, el intento queda en `requiere_revision`, el pedido no cambia y se avisa al administrador. La devolución, si corresponde, se hace manualmente desde Mercado Pago.
 
 ---
 
@@ -1367,6 +1464,22 @@ Productos y variantes pueden implementarse primero como borradores inactivos. La
 | Baja | Mejoras futuras de stock |
 | Baja | WhatsApp Business API |
 
+## Orden acordado para lo que falta
+
+Ya están implementados: autenticación y roles, productos y variantes, categorías y Ofertas, imágenes, ajuste e-commerce y catálogo. El resto del backend se completa en este orden, antes de construir las pantallas:
+
+1. Auditoría (primero, para que los módulos siguientes la usen; se agrega también a los módulos existentes).
+2. Reglas de precio de pago y cálculo de la compensación.
+3. Carrito.
+4. Checkout, pedidos e historial del cliente.
+5. Coordinación de envío y WhatsApp.
+6. Mercado Pago, webhooks e idempotencia.
+7. Edición y reemplazo de pedidos.
+8. Emails.
+9. Actualizaciones masivas de precios.
+
+La dirección visual se define en paralelo. Las pantallas Blade se construyen después, sobre el backend terminado.
+
 ---
 
 # 49. Pendientes técnicos permitidos para Claude
@@ -1378,9 +1491,9 @@ Estas decisiones pueden resolverse durante implementación siempre que respeten 
 - proveedor cloud S3-compatible;
 - proveedor de email transaccional;
 - implementación concreta de colas;
-- decisión técnica final entre Checkout API / Bricks / modalidad equivalente de Mercado Pago;
-- estrategia exacta de generación de URL segura de pago;
 - formato exacto del historial de auditoría.
+
+Ya resueltos: la integración con Mercado Pago es Checkout Bricks y el link de pago usa un token aleatorio sin login (sección 35).
 
 Claude no debe modificar las reglas de negocio aquí definidas para resolver estos pendientes.
 
@@ -1399,7 +1512,9 @@ No implementar:
 - permisos granulares por empleado;
 - SPA;
 - React/Vue;
-- cancelación automática de pedidos.
+- cancelación automática de pedidos;
+- pago en efectivo (Rapipago/Pago Fácil);
+- facturación electrónica (ARCA/AFIP): el negocio factura con su sistema actual.
 
 ---
 
