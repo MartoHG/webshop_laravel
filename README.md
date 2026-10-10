@@ -1,4 +1,4 @@
-# El Refugio Verano Edition
+# El Refugio
 
 Base Laravel del webshop de El Refugio. Las reglas funcionales y de arquitectura están en [el-refugio-decisiones.md](el-refugio-decisiones.md).
 

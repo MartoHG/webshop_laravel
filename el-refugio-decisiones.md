@@ -1,8 +1,8 @@
-# El Refugio Verano Edition — Especificación final de diseño del sistema
+# El Refugio — Especificación final de diseño del sistema
 
 ## 1. Propósito del documento
 
-Este documento consolida las decisiones funcionales, técnicas y de arquitectura definidas para **El Refugio Verano Edition**.
+Este documento consolida las decisiones funcionales, técnicas y de arquitectura definidas para **El Refugio**.
 
 Su objetivo es servir como **documento rector para Claude**, que será quien implemente el sistema.
 
@@ -12,7 +12,7 @@ La intención es que Claude pueda desarrollar sobre una base clara y consistente
 
 # 2. Objetivo general
 
-Construir un **webshop/ecommerce** para una forrajería, presentado inicialmente como **“El Refugio Verano Edition”** o nombre similar.
+Construir un **webshop/ecommerce** para **El Refugio**, una forrajería.
 
 Rubros iniciales:
 
@@ -341,9 +341,13 @@ Las categorías normales podrán:
 - editarse;
 - activarse/desactivarse;
 - ordenarse;
-- asignarse a múltiples productos.
+- asignarse a múltiples productos;
+- tener una imagen opcional, que se usa en la grilla de categorías de la home;
+- marcarse como destacadas para aparecer en la home.
 
 No se puede desactivar una categoría si con ello algún producto activo quedaría sin ninguna categoría activa.
+
+Las categorías son totalmente personalizables. Los rubros principales al inicio son muebles y sillones de jardín, y kayaks y pesca, pero el administrador puede crear las que necesite.
 
 ---
 
@@ -1399,7 +1403,21 @@ Funcionalmente el panel deberá permitir gestionar:
 - reglas de pricing;
 - ajuste e-commerce;
 - usuarios;
-- auditoría.
+- auditoría;
+- contenido editable de la home y datos de contacto.
+
+## Contenido editable de la home
+
+El administrador puede modificar desde el panel, sin tocar código:
+
+- **Portada:** una sola, sin carrusel. Tiene una imagen grande, un título, un subtítulo opcional y un botón opcional con texto y destino. Si no hay portada configurada, la home se muestra sin ella.
+- **Beneficios:** una lista de frases cortas con ícono, por ejemplo "Envíos a todo el país" o "Coordinamos por WhatsApp". Se pueden agregar, editar, ordenar, activar y desactivar. El ícono se elige de un conjunto fijo definido por el diseño.
+- **Categorías con foto:** la grilla de categorías de la home muestra las categorías activas marcadas como destacadas, en su orden, con su imagen. Una categoría sin imagen se muestra con un fondo neutro.
+- **Datos de contacto:** WhatsApp del negocio (botón flotante "Hablá con nosotros"), email, dirección, horarios y redes sociales. Se guardan en `configuraciones`.
+
+Las imágenes de la portada y de las categorías se procesan igual que las de productos: en cola, convertidas a WebP y sin conservar el original.
+
+Los cambios de contenido quedan auditados.
 
 ---
 
@@ -1477,6 +1495,7 @@ Ya están implementados: autenticación y roles, productos y variantes, categor�
 7. Edición y reemplazo de pedidos.
 8. Emails.
 9. Actualizaciones masivas de precios.
+10. Contenido editable de la home y datos de contacto (sección 46).
 
 La dirección visual se define en paralelo. Las pantallas Blade se construyen después, sobre el backend terminado.
 
