@@ -1,0 +1,26 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-10T21:25:00Z" },
+  "title": "El Refugio — boceto de la home",
+  "launch": { "view": "canvas" },
+  "pages": [
+    { "id": "home", "name": "Home" },
+    { "id": "compra", "name": "Compra" }
+  ],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 4300, "expand": "fill", "title": "Home — escritorio", "page": "home" },
+    "Celular.dc.html": { "x": 1520, "y": 0, "w": 390, "h": 4100, "title": "Home — celular", "radius": 28, "page": "home" },
+    "Producto.dc.html": { "x": 0, "y": 0, "w": 390, "h": 1720, "title": "1 · Producto", "radius": 28, "page": "compra" },
+    "Carrito.dc.html": { "x": 470, "y": 0, "w": 390, "h": 1300, "title": "2 · Carrito", "radius": 28, "page": "compra" },
+    "Checkout.dc.html": { "x": 940, "y": 0, "w": 390, "h": 1960, "title": "3 · Confirmar pedido", "radius": 28, "page": "compra" },
+    "Confirmado.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 1100, "title": "4 · Pedido recibido", "radius": 28, "page": "compra" },
+    "Pago.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 1640, "title": "5 · Link de pago", "radius": 28, "page": "compra" }
+  },
+  "order": ["Main.dc.html", "Celular.dc.html", "Producto.dc.html", "Carrito.dc.html", "Checkout.dc.html", "Confirmado.dc.html", "Pago.dc.html"],
+  "notes": {
+    "fotos": { "x": 1990, "y": 0, "w": 300, "text": "Fotos y precios de ejemplo, tomados de los posteos de @elrefugio.olav. El negocio va a cargar los suyos desde el panel.", "fill": "orange", "page": "home" },
+    "titulocompra": { "x": 0, "y": -300, "text": "Flujo de compra en el celular", "kind": "title1", "maxW": 2270, "page": "compra" },
+    "ejemplo": { "x": 2350, "y": 0, "w": 300, "text": "Precios, costo de envío y porcentajes de cuotas de EJEMPLO para mostrar el flujo. Los porcentajes reales los configura el dueño en el panel.", "fill": "orange", "page": "compra" }
+  },
+  "designSystems": []
+}
