@@ -106,6 +106,14 @@ class WhatsAppEnlaceService
         return $this->enlace($pedido->telefono_cliente, $mensaje);
     }
 
+    /**
+     * URL wa.me para un teléfono ya cargado. Devuelve null cuando el teléfono no puede normalizarse.
+     */
+    public function urlParaTelefono(string $telefono, string $mensaje): ?string
+    {
+        return $this->enlace($telefono, $mensaje)['url'];
+    }
+
     public function puedeEnviarLinkPago(Pedido $pedido): bool
     {
         return in_array($pedido->estado_pago, [EstadoPago::Habilitado, EstadoPago::Pendiente], true)

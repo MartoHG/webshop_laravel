@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tienda\ActualizarItemCarritoRequest;
 use App\Http\Requests\Tienda\AgregarItemCarritoRequest;
 use App\Servicios\Carrito\CarritoService;
+use App\Servicios\Carrito\RetiroEnLocalService;
 use Illuminate\Http\JsonResponse;
 
 class CarritoController extends Controller
@@ -55,6 +56,15 @@ class CarritoController extends Controller
             'mensaje' => 'Producto quitado del carrito.',
             'carrito' => $servicio->quitar($variante),
         ]);
+    }
+
+    public function retiro(CarritoService $servicio, RetiroEnLocalService $retiro): JsonResponse
+    {
+        if (! $servicio->estaConfigurado()) {
+            return $this->errorAjusteNoConfigurado();
+        }
+
+        return response()->json($retiro->enlace());
     }
 
     public function vaciar(CarritoService $servicio): JsonResponse

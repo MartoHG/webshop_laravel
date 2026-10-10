@@ -14,6 +14,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             CategoriaSeeder::class,
             ReglaPrecioPagoSeeder::class,
+            BeneficioHomeSeeder::class,
+            ContactoSeeder::class,
         ]);
     }
 }
