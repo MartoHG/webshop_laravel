@@ -16,12 +16,12 @@ class ProductoService
     /** @return Collection<int, Producto> */
     public function listar(): Collection
     {
-        return Producto::query()->with(['variantes', 'categorias', 'imagenes'])->latest('id')->get();
+        return Producto::query()->with(['variantes', 'categorias.imagenContenido', 'imagenes'])->latest('id')->get();
     }
 
     public function mostrar(Producto $producto): Producto
     {
-        return $producto->load(['variantes.imagenes', 'categorias', 'imagenes']);
+        return $producto->load(['variantes.imagenes', 'categorias.imagenContenido', 'imagenes']);
     }
 
     /** @param array{nombre: string, descripcion?: ?string, variantes: list<array{color?: ?string, etiqueta?: ?string, sku: string, precio_base: numeric-string|int|float}>} $datos */

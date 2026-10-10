@@ -19,13 +19,16 @@ class CatalogoService
         return $this->ajuste->obtenerPorcentaje() !== null;
     }
 
-    /** @return list<array{nombre: string, slug: string}> */
+    /** @return list<array{nombre: string, slug: string, destacada_en_home: bool, imagen_url: ?string, imagen_miniatura_url: ?string}> */
     public function listarCategorias(): array
     {
-        return Categoria::query()->where('activo', true)->orderBy('orden')->orderBy('nombre')
-            ->get(['nombre', 'slug'])->map(fn (Categoria $categoria): array => [
+        return Categoria::query()->with('imagenContenido')->where('activo', true)->orderBy('orden')->orderBy('nombre')
+            ->get()->map(fn (Categoria $categoria): array => [
                 'nombre' => $categoria->nombre,
                 'slug' => $categoria->slug,
+                'destacada_en_home' => $categoria->destacada_en_home,
+                'imagen_url' => $categoria->imagen_url,
+                'imagen_miniatura_url' => $categoria->imagen_miniatura_url,
             ])->all();
     }
 

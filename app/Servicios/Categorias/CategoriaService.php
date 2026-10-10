@@ -12,7 +12,7 @@ class CategoriaService
 {
     public function listar(): Collection
     {
-        return Categoria::query()->orderBy('orden')->orderBy('nombre')->get();
+        return Categoria::query()->with('imagenContenido')->orderBy('orden')->orderBy('nombre')->get();
     }
 
     /** @param array{nombre: string, slug?: ?string, orden?: int} $datos */

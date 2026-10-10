@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Servicios\Imagenes\ProcesadorImagenes;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -9,7 +10,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use RuntimeException;
 use Throwable;
 
 class ProcesarImagenProducto implements ShouldQueue
@@ -49,59 +49,25 @@ class ProcesarImagenProducto implements ShouldQueue
             'updated_at' => now(),
         ]);
 
+        $procesador = app(ProcesadorImagenes::class);
         $contenido = Storage::disk($archivo->disco_temporal)->get($archivo->ruta_temporal);
-        $datosImagen = getimagesizefromstring($contenido);
-
-        if ($datosImagen === false || ! in_array($datosImagen['mime'] ?? null, ['image/jpeg', 'image/png', 'image/webp'], true)) {
-            throw new RuntimeException('El archivo no es una imagen JPEG, PNG o WebP válida.');
-        }
-
-        $ancho = (int) $datosImagen[0];
-        $alto = (int) $datosImagen[1];
-
-        if (($ancho * $alto) > (int) config('imagenes.maximo_pixeles')) {
-            throw new RuntimeException('La imagen supera el límite de píxeles permitido.');
-        }
-
-        $imagenOrigen = imagecreatefromstring($contenido);
-
-        if ($imagenOrigen === false) {
-            throw new RuntimeException('El archivo no contiene una imagen válida.');
-        }
-
-        try {
-            if (! function_exists('imagewebp')) {
-                throw new RuntimeException('GD no tiene soporte para WebP.');
-            }
-
-            $detalle = $this->convertirWebp(
-                $imagenOrigen,
-                $ancho,
-                $alto,
-                (int) config('imagenes.maximo_ancho_detalle'),
-                (int) config('imagenes.maximo_alto_detalle'),
-                (int) config('imagenes.calidad_detalle'),
-            );
-            $miniatura = $this->convertirWebp(
-                $imagenOrigen,
-                $ancho,
-                $alto,
-                (int) config('imagenes.maximo_ancho_miniatura'),
-                (int) config('imagenes.maximo_alto_miniatura'),
-                (int) config('imagenes.calidad_miniatura'),
-            );
-        } finally {
-            imagedestroy($imagenOrigen);
-        }
+        [$detalle, $miniatura] = $procesador->convertirWebp($contenido, [
+            [
+                'maximo_ancho' => (int) config('imagenes.maximo_ancho_detalle'),
+                'maximo_alto' => (int) config('imagenes.maximo_alto_detalle'),
+                'calidad' => (int) config('imagenes.calidad_detalle'),
+            ],
+            [
+                'maximo_ancho' => (int) config('imagenes.maximo_ancho_miniatura'),
+                'maximo_alto' => (int) config('imagenes.maximo_alto_miniatura'),
+                'calidad' => (int) config('imagenes.calidad_miniatura'),
+            ],
+        ]);
 
         $rutaBase = trim((string) config('imagenes.directorio_final'), '/').'/'.$archivo->id;
         $rutaDetalle = $rutaBase.'/detalle.webp';
         $rutaMiniatura = $rutaBase.'/miniatura.webp';
-        $disco = Storage::disk($archivo->disco);
-
-        if (! $disco->put($rutaDetalle, $detalle, ['visibility' => 'public']) || ! $disco->put($rutaMiniatura, $miniatura, ['visibility' => 'public'])) {
-            throw new RuntimeException('No se pudieron guardar las versiones WebP.');
-        }
+        $procesador->guardar($archivo->disco, [$rutaDetalle => $detalle, $rutaMiniatura => $miniatura]);
 
         $procesado = DB::transaction(function () use ($archivo, $rutaDetalle, $rutaMiniatura, $contenido): bool {
             $actual = DB::table('archivos_imagenes_producto')->where('id', $archivo->id)->lockForUpdate()->first();
@@ -129,7 +95,7 @@ class ProcesarImagenProducto implements ShouldQueue
         });
 
         if (! $procesado) {
-            $disco->delete([$rutaDetalle, $rutaMiniatura]);
+            Storage::disk($archivo->disco)->delete([$rutaDetalle, $rutaMiniatura]);
         }
 
         Storage::disk($archivo->disco_temporal)->delete($archivo->ruta_temporal);
@@ -159,33 +125,5 @@ class ProcesarImagenProducto implements ShouldQueue
                 'updated_at' => now(),
             ]);
         });
-    }
-
-    private function convertirWebp(\GdImage $origen, int $ancho, int $alto, int $maximoAncho, int $maximoAlto, int $calidad): string
-    {
-        $escala = min(1, $maximoAncho / $ancho, $maximoAlto / $alto);
-        $anchoDestino = max(1, (int) floor($ancho * $escala));
-        $altoDestino = max(1, (int) floor($alto * $escala));
-        $destino = imagecreatetruecolor($anchoDestino, $altoDestino);
-
-        if ($destino === false) {
-            throw new RuntimeException('No se pudo reservar memoria para procesar la imagen.');
-        }
-
-        imagealphablending($destino, false);
-        imagesavealpha($destino, true);
-        imagefill($destino, 0, 0, imagecolorallocatealpha($destino, 0, 0, 0, 127));
-        imagecopyresampled($destino, $origen, 0, 0, 0, 0, $anchoDestino, $altoDestino, $ancho, $alto);
-
-        ob_start();
-        $convertida = imagewebp($destino, null, $calidad);
-        $contenido = ob_get_clean();
-        imagedestroy($destino);
-
-        if (! $convertida || $contenido === false) {
-            throw new RuntimeException('No se pudo convertir la imagen a WebP.');
-        }
-
-        return $contenido;
     }
 }

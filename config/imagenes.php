@@ -13,4 +13,24 @@ return [
     'maximo_alto_miniatura' => 480,
     'calidad_detalle' => 84,
     'calidad_miniatura' => 78,
+    'contenido' => [
+        'directorio_temporal' => 'imagenes-contenido/temporales',
+        'directorio_final' => 'imagenes-contenido',
+        'portada' => [
+            'maximo_ancho' => 2400,
+            'maximo_alto' => 1600,
+            'calidad' => 82,
+            'maximo_ancho_miniatura' => 960,
+            'maximo_alto_miniatura' => 640,
+            'calidad_miniatura' => 78,
+        ],
+        'categoria' => [
+            'maximo_ancho' => 1200,
+            'maximo_alto' => 1500,
+            'calidad' => 82,
+            'maximo_ancho_miniatura' => 480,
+            'maximo_alto_miniatura' => 600,
+            'calidad_miniatura' => 78,
+        ],
+    ],
 ];
