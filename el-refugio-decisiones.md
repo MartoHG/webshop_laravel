@@ -14,11 +14,9 @@ La intención es que Claude pueda desarrollar sobre una base clara y consistente
 
 Construir un **webshop/ecommerce** para **El Refugio**, una forrajería.
 
-Rubros iniciales:
+Rubro de la tienda online: **muebles de jardín** (sillas, sillones, mesas, juegos de living y reposeras, sobre todo de plástico de buena calidad).
 
-- Muebles para jardín
-- Artículos de pesca
-- Kayaks
+Kayaks y artículos de pesca quedaron descartados: no se venden ni está previsto venderlos en el mediano plazo. El local también vende alimento para mascotas y bazar, que no forman parte de la tienda online.
 
 El público objetivo estará compuesto, en buena medida, por usuarios con poca experiencia informática.
 
@@ -347,7 +345,7 @@ Las categorías normales podrán:
 
 No se puede desactivar una categoría si con ello algún producto activo quedaría sin ninguna categoría activa.
 
-Las categorías son totalmente personalizables. Los rubros principales al inicio son muebles y sillones de jardín, y kayaks y pesca, pero el administrador puede crear las que necesite.
+Las categorías son totalmente personalizables. La tienda vende muebles de jardín; el administrador crea las categorías que necesite (por ejemplo sillas, sillones, mesas, juegos y reposeras).
 
 ---
 
@@ -721,6 +719,12 @@ carrito
 ```
 
 El cliente no paga antes de conocer el costo total.
+
+## Retiro en el local
+
+El Refugio tiene local en Olavarría. Quien prefiera retirar en el local no usa el checkout: el carrito ofrece un botón "Retirar en el local" que abre WhatsApp hacia el número del negocio (sección 46) con un mensaje prearmado que incluye los productos, variantes y cantidades del carrito. La venta se arregla por WhatsApp y no crea un pedido en el sistema.
+
+El botón no exige iniciar sesión ni email verificado.
 
 ---
 
@@ -1495,7 +1499,7 @@ Ya están implementados: autenticación y roles, productos y variantes, categor�
 7. Edición y reemplazo de pedidos.
 8. Emails.
 9. Actualizaciones masivas de precios.
-10. Contenido editable de la home y datos de contacto (sección 46).
+10. Contenido editable de la home y datos de contacto (sección 46), incluido el link de retiro en el local (sección 24).
 
 La dirección visual se define en paralelo. Las pantallas Blade se construyen después, sobre el backend terminado.
 
