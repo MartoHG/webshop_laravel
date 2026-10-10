@@ -2,10 +2,12 @@
 
 namespace App\Servicios\Pedidos;
 
+use App\Enums\EstadoIntentoPago;
 use App\Enums\EstadoPago;
 use App\Enums\EstadoPedido;
 use App\Enums\MotivoCancelacion;
 use App\Models\ItemPedido;
+use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\Usuario;
 use App\Servicios\Auditoria\AuditoriaService;
@@ -99,6 +101,11 @@ class PedidoService
             $pedido->detalle_cancelacion = $detalle;
             $pedido->token_pago = null;
             $pedido->save();
+
+            Pago::query()
+                ->where('pedido_id', $pedido->getKey())
+                ->where('estado', EstadoIntentoPago::Creado->value)
+                ->update(['estado' => EstadoIntentoPago::Cancelado->value, 'updated_at' => now()]);
 
             $this->auditoria->registrar('pedido.cancelado', $pedido, $anteriores, [
                 'estado_pedido' => EstadoPedido::Cancelado->value,

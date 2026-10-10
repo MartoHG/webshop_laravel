@@ -89,6 +89,11 @@ class Pedido extends Model
         return $this->hasMany(ItemPedido::class);
     }
 
+    public function pagos(): HasMany
+    {
+        return $this->hasMany(Pago::class);
+    }
+
     public function pedidoOrigen(): BelongsTo
     {
         return $this->belongsTo(Pedido::class, 'pedido_origen_id');

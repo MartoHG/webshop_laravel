@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Administracion\CoordinacionPedidoController;
+use App\Http\Controllers\Administracion\PagoController;
 use App\Http\Controllers\Administracion\PedidoController;
 use App\Http\Middleware\VerificarRolAdministrador;
 use App\Http\Middleware\VerificarUsuarioActivo;
@@ -13,6 +14,7 @@ Route::middleware(['auth', VerificarUsuarioActivo::class, VerificarRolAdministra
         Route::get('/', [PedidoController::class, 'index'])->name('index');
         Route::get('/{pedido}', [PedidoController::class, 'mostrar'])->name('mostrar');
         Route::post('/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->name('cancelar');
+        Route::get('/{pedido}/pagos', [PagoController::class, 'index'])->name('pagos');
 
         Route::patch('/{pedido}/contacto', [CoordinacionPedidoController::class, 'actualizarContacto'])->name('contacto');
         Route::patch('/{pedido}/envio/cotizacion', [CoordinacionPedidoController::class, 'cotizarEnvio'])->name('envio.cotizacion');
