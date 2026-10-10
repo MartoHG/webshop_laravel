@@ -4,7 +4,7 @@ Base Laravel del webshop de El Refugio. Las reglas funcionales y de arquitectura
 
 ## Requisitos locales
 
-- PHP 8.3 o superior y Composer
+- PHP 8.4 o superior (con la extensión bcmath) y Composer
 - Node.js y npm
 - MySQL y un usuario con permisos sobre las bases de desarrollo y pruebas
 
