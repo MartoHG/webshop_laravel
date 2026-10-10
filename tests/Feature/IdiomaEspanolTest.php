@@ -20,6 +20,13 @@ class IdiomaEspanolTest extends TestCase
         $this->app->setLocale('es');
     }
 
+    public function test_sin_sesion_iniciada_responde_en_espanol(): void
+    {
+        $this->getJson('/checkout')
+            ->assertUnauthorized()
+            ->assertExactJson(['message' => 'Iniciá sesión para continuar.']);
+    }
+
     public function test_checkout_sin_localidad_responde_el_error_en_espanol(): void
     {
         $usuario = Usuario::factory()->create();
