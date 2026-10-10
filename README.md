@@ -32,7 +32,7 @@ La aplicación queda disponible en `http://localhost:8000`. El archivo `.env`, l
 
 ## Estado
 
-El backend de la V1 está casi completo (falta terminar la parte B del contenido de la home, ver [PROXIMOS-PASOS.md](PROXIMOS-PASOS.md)) y responde JSON. Todavía no hay pantallas Blade: el diseño aprobado está en [diseno/boceto/](diseno/boceto/LEEME.md) y las vistas son la próxima fase.
+El backend de la V1 está completo y responde JSON. Ver [PROXIMOS-PASOS.md](PROXIMOS-PASOS.md) para lo que sigue. Todavía no hay pantallas Blade: el diseño aprobado está en [diseno/boceto/](diseno/boceto/LEEME.md) y las vistas son la próxima fase.
 
 Arquitectura: `routes/*.php` (cargadas desde `routes/web.php`) → `app/Http/Controllers` → `app/Http/Requests` (validación y autorización) → `app/Servicios` (lógica de negocio) → `app/Models`.
 
@@ -45,7 +45,7 @@ Arquitectura: `routes/*.php` (cargadas desde `routes/web.php`) → `app/Http/Con
 | Pedidos | Coordinación de envío, links de WhatsApp, edición y reemplazo, cancelación, historial del cliente. |
 | Pagos | Mercado Pago con Checkout Bricks, link de pago sin login, webhook firmado, conciliación, revisión de pagos. |
 | Emails | Pedido creado, pago aprobado y alertas automáticos; no contactado, recordatorio y despachado manuales. |
-| Contenido | Portada y categorías destacadas con foto. En curso: beneficios, datos de contacto y horarios, datos de la home y retiro en el local. |
+| Contenido | Portada, beneficios, categorías destacadas con foto, datos de contacto y horarios, datos de la home (`/tienda/inicio`) y retiro en el local. |
 | Auditoría | Registro inmutable de las acciones sensibles del panel. |
 
 Después de configurar MySQL y ejecutar las migraciones, crea el primer administrador con `php artisan usuario:crear-administrador`. El comando solicita los datos y la clave de forma interactiva; solo funciona mientras todavía no exista una cuenta administradora.

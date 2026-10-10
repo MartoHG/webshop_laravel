@@ -4,8 +4,7 @@ Nota de traspaso escrita al cerrar la sesión del 10/10/2026, para retomar desde
 
 ## Dónde quedó
 
-- **Backend de la V1 casi completo:** los módulos 1 a 9 de la sección 48 de [el-refugio-decisiones.md](el-refugio-decisiones.md) están implementados, con tests en verde y commiteados en `main`. Del módulo 10 (contenido de la home) están la portada y las fotos de categorías.
-- **En curso al cerrar: M9 parte B.** Faltan beneficios editables (máximo 6 activos), datos de contacto con horarios por día y el cálculo de "abierto ahora", `GET /tienda/inicio` con los datos de la home y `GET /carrito/retiro-whatsapp`. Si no aparece un commit "Agregar beneficios, contacto, datos de la home y retiro en el local", es lo primero que hay que retomar. El encargo detallado está en la sección 46 del documento de decisiones y en la subsección "Retiro en el local" de la sección 24. Todo responde JSON. El [README](README.md) tiene la tabla de módulos.
+- **Backend de la V1 completo:** los diez módulos de la sección 48 de [el-refugio-decisiones.md](el-refugio-decisiones.md) están implementados, con 225 tests en verde, y commiteados en `main`. Todo responde JSON. El [README](README.md) tiene la tabla de módulos.
 - **Diseño aprobado: «La etiqueta».**
   - Boceto de la home (escritorio y celular) y del flujo de compra (producto, carrito, checkout, pedido recibido, link de pago) en [diseno/boceto/](diseno/boceto/LEEME.md).
   - Lienzo original: https://claude.ai/artifact/9c4rGkGfkjLkGMQb1ReAhS (privado, se abre con la cuenta del dueño).
@@ -21,7 +20,7 @@ Nota de traspaso escrita al cerrar la sesión del 10/10/2026, para retomar desde
 - El diseño lo hace el orquestador con las skills `impeccable`, `emil-design-eng` y `design-taste-frontend` y con la herramienta de diseño de Claude. Haiku implementa las vistas siguiendo el boceto.
 - Las reglas de negocio están en `el-refugio-decisiones.md`. Cualquier decisión nueva se anota ahí antes de implementarla.
 
-## Fase 3: pantallas (después de cerrar M9)
+## Fase 3: pantallas (lo que sigue)
 
 1. **Base visual en código** (orquestador):
    - Tokens en el `@theme` de Tailwind v4 (`resources/css/app.css`): paleta blanco, grafito #26282B, naranja #F2601F, celeste #19A7CE y amarillo #FFC20E; fuente Archivo.

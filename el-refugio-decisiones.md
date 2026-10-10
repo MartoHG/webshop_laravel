@@ -1507,7 +1507,7 @@ Ya están implementados: autenticación y roles, productos y variantes, categor�
 
 La dirección visual se define en paralelo. Las pantallas Blade se construyen después, sobre el backend terminado.
 
-**Estado al 10/10/2026:** los puntos 1 a 9 están implementados y probados. Del punto 10 están la portada y las fotos de categorías; faltan beneficios, contacto y horarios, los datos de la home y el link de retiro. La dirección visual «La etiqueta» está aprobada (boceto en `diseno/boceto/`). Sigue la fase de pantallas: primero la tienda, después el panel de administración.
+**Estado al 10/10/2026:** los diez puntos están implementados y probados. La dirección visual «La etiqueta» está aprobada (boceto en `diseno/boceto/`). Sigue la fase de pantallas: primero la tienda, después el panel de administración.
 
 ---
 
