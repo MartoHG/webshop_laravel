@@ -22,7 +22,10 @@ class PedidoService
 
     private const int POR_PAGINA_ADMINISTRACION = 30;
 
-    public function __construct(private AuditoriaService $auditoria) {}
+    public function __construct(
+        private AuditoriaService $auditoria,
+        private WhatsAppEnlaceService $whatsapp,
+    ) {}
 
     /** @return LengthAwarePaginator<int, Pedido> */
     public function listarDelCliente(Usuario $usuario): LengthAwarePaginator
@@ -168,6 +171,7 @@ class PedidoService
             ],
             'motivo_cancelacion' => $pedido->motivo_cancelacion?->value,
             'detalle_cancelacion' => $pedido->detalle_cancelacion,
+            'expreso' => $pedido->expreso,
             'subtotal_productos' => $pedido->subtotal_productos,
             'costo_envio' => $pedido->costo_envio,
             'total_base' => $pedido->total_base,
@@ -184,6 +188,7 @@ class PedidoService
                 'variante_producto_id' => $item->variante_producto_id,
                 ...$this->representarItem($item),
             ])->values()->all(),
+            'whatsapp' => $this->whatsapp->enlacesDelPedido($pedido),
         ];
     }
 
