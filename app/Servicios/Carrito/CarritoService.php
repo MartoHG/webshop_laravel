@@ -93,6 +93,16 @@ class CarritoService
     }
 
     /**
+     * Ids de las variantes en el carrito, leídos de la sesión y sin consultar la base de datos.
+     *
+     * @return list<int>
+     */
+    public function idsDeVariantes(): array
+    {
+        return array_keys($this->leerCarrito());
+    }
+
+    /**
      * Recalcula el carrito desde la base de datos. Las líneas no disponibles se conservan y no suman al subtotal.
      *
      * @return array{items: list<array<string, mixed>>, subtotal: string, cantidad_unidades: int, puede_continuar: bool}
