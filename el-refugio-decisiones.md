@@ -4,9 +4,9 @@
 
 Este documento consolida las decisiones funcionales, técnicas y de arquitectura definidas para **El Refugio Verano Edition**.
 
-Su objetivo es servir como **documento rector para Codex**, que será quien implemente el sistema.
+Su objetivo es servir como **documento rector para Claude**, que será quien implemente el sistema.
 
-La intención es que Codex pueda desarrollar sobre una base clara y consistente, respetando las decisiones ya tomadas y evitando introducir patrones, capas o tecnologías que contradigan este diseño.
+La intención es que Claude pueda desarrollar sobre una base clara y consistente, respetando las decisiones ya tomadas y evitando introducir patrones, capas o tecnologías que contradigan este diseño.
 
 ---
 
@@ -31,7 +31,13 @@ Por lo tanto, la aplicación deberá priorizar:
 - mensajes comprensibles;
 - checkout sencillo.
 
-Las decisiones visuales y de UX serán definidas aparte por **DesignerGPT**.
+Las decisiones visuales y de UX se trabajarán aparte con Claude, usando:
+
+- la skill **impeccable** para dar forma, auditar y pulir la interfaz;
+- la skill **emil-design-eng**, con los criterios de Emil Kowalski sobre detalle de componentes, animaciones y pulido;
+- las herramientas de diseño de Anthropic.
+
+El objetivo es evitar una tienda genérica con aspecto de plantilla: la identidad visual debe sentirse propia de El Refugio sin perder la simplicidad que necesita su público.
 
 ---
 
@@ -86,7 +92,7 @@ Model / Eloquent
 
 La organización interna podrá usar carpetas y subcarpetas por módulo o funcionalidad.
 
-La estructura exacta de carpetas será definida por Codex respetando esta arquitectura.
+La estructura exacta de carpetas será definida por Claude respetando esta arquitectura.
 
 ---
 
@@ -826,7 +832,7 @@ despachado
 entregado
 ```
 
-Codex puede ajustar nombres exactos manteniendo el significado y utilizando español.
+Claude puede ajustar nombres exactos manteniendo el significado y utilizando español.
 
 ---
 
@@ -1277,7 +1283,7 @@ ImagenProducto
 
 # 46. Panel administrativo — alcance funcional
 
-El diseño visual queda delegado a DesignerGPT.
+El diseño visual se trabajará con las skills y herramientas de diseño indicadas en la sección 2.
 
 Funcionalmente el panel deberá permitir gestionar:
 
@@ -1300,7 +1306,7 @@ Funcionalmente el panel deberá permitir gestionar:
 
 ---
 
-# 47. Reglas críticas que Codex debe respetar
+# 47. Reglas críticas que Claude debe respetar
 
 1. Arquitectura Controller → Form Request → Service → Model/Eloquent.
 2. Código propio del dominio en español.
@@ -1363,7 +1369,7 @@ Productos y variantes pueden implementarse primero como borradores inactivos. La
 
 ---
 
-# 49. Pendientes técnicos permitidos para Codex
+# 49. Pendientes técnicos permitidos para Claude
 
 Estas decisiones pueden resolverse durante implementación siempre que respeten este documento:
 
@@ -1376,7 +1382,7 @@ Estas decisiones pueden resolverse durante implementación siempre que respeten 
 - estrategia exacta de generación de URL segura de pago;
 - formato exacto del historial de auditoría.
 
-Codex no debe modificar las reglas de negocio aquí definidas para resolver estos pendientes.
+Claude no debe modificar las reglas de negocio aquí definidas para resolver estos pendientes.
 
 ---
 
@@ -1435,7 +1441,7 @@ administrador
 → marca entrega
 ```
 
-Ese es el flujo funcional principal que Codex debe preservar.
+Ese es el flujo funcional principal que Claude debe preservar.
 
 ---
 
@@ -1444,7 +1450,7 @@ Ese es el flujo funcional principal que Codex debe preservar.
 El sistema debe ser:
 
 - simple de mantener;
-- claro para Codex;
+- claro para Claude;
 - coherente con Laravel tradicional;
 - fácil de operar por un comercio pequeño;
 - seguro respecto de pagos;
