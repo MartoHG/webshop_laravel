@@ -92,6 +92,14 @@ La organización interna podrá usar carpetas y subcarpetas por módulo o funcio
 
 La estructura exacta de carpetas será definida por Claude respetando esta arquitectura.
 
+## Respuestas HTML y JSON
+
+Cada ruta sirve las dos cosas desde el mismo controlador: devuelve JSON cuando la solicitud lo pide (`$request->expectsJson()`) y, si no, la vista Blade o un redirect. No se duplican controladores ni rutas para la web y para JSON. Los tests de reglas de negocio siguen usando JSON; las vistas se prueban aparte.
+
+- Formularios clásicos: POST → redirect con mensaje flash; los errores de validación vuelven al formulario con `old()`.
+- htmx: las solicitudes con el header `HX-Request` reciben solo el fragmento que se reemplaza (por ejemplo, el carrito).
+- Las vistas usan los componentes de `resources/views/components` (etiqueta, sello, botón, íconos, tarjeta de producto) y el layout `x-layouts.tienda`. El boceto aprobado está en `diseno/boceto/`.
+
 ---
 
 # 5. Convención de idioma

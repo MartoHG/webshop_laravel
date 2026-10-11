@@ -103,6 +103,14 @@ class CarritoService
     }
 
     /**
+     * Unidades guardadas en la sesión, sin consultar precios ni disponibilidad. Sirve para el contador del encabezado.
+     */
+    public function cantidadDeUnidades(): int
+    {
+        return array_sum($this->leerCarrito());
+    }
+
+    /**
      * Recalcula el carrito desde la base de datos. Las líneas no disponibles se conservan y no suman al subtotal.
      *
      * @return array{items: list<array<string, mixed>>, subtotal: string, cantidad_unidades: int, puede_continuar: bool}

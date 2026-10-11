@@ -268,7 +268,7 @@ class ContenidoHomeTest extends TestCase
 
     public function test_inicio_compone_portada_beneficios_categorias_destacadas_y_contacto(): void
     {
-        $this->getJson('/tienda/inicio')
+        $this->getJson('/')
             ->assertOk()
             ->assertJsonPath('portada', null)
             ->assertJsonCount(0, 'beneficios')
@@ -277,7 +277,7 @@ class ContenidoHomeTest extends TestCase
 
         $imagenPortada = ImagenContenido::factory()->listo()->create(['tipo' => ImagenContenido::TIPO_PORTADA]);
         Configuracion::query()->create(['clave' => 'portada.imagen_id', 'valor' => (string) $imagenPortada->id]);
-        $this->getJson('/tienda/inicio')->assertJsonPath('portada', null);
+        $this->getJson('/')->assertJsonPath('portada', null);
 
         Configuracion::query()->create(['clave' => 'portada.titulo', 'valor' => 'Verano en el jardín']);
 
@@ -306,7 +306,7 @@ class ContenidoHomeTest extends TestCase
         Configuracion::query()->create(['clave' => 'contacto.whatsapp', 'valor' => '2284 123456']);
         Configuracion::query()->create(['clave' => 'contacto.instagram', 'valor' => 'elrefugio.olav']);
 
-        $respuesta = $this->getJson('/tienda/inicio')
+        $respuesta = $this->getJson('/')
             ->assertOk()
             ->assertJsonPath('portada.titulo', 'Verano en el jardín')
             ->assertJsonPath('portada.imagen_url', $imagenPortada->url())
@@ -326,6 +326,53 @@ class ContenidoHomeTest extends TestCase
         $this->assertNotNull($respuesta->json('categorias.0.imagen_miniatura_url'));
     }
 
+    public function test_la_home_en_html_muestra_portada_beneficios_categorias_y_ofertas(): void
+    {
+        $this->configurarAjuste('0');
+        $imagenPortada = ImagenContenido::factory()->listo()->create(['tipo' => ImagenContenido::TIPO_PORTADA]);
+        Configuracion::query()->create(['clave' => 'portada.imagen_id', 'valor' => (string) $imagenPortada->id]);
+        Configuracion::query()->create(['clave' => 'portada.titulo', 'valor' => 'Verano en el jardín']);
+        Configuracion::query()->create(['clave' => 'portada.boton_texto', 'valor' => 'Ver muebles']);
+        Configuracion::query()->create(['clave' => 'portada.boton_destino', 'valor' => '/catalogo']);
+        BeneficioHome::factory()->create(['icono' => IconoBeneficio::Envio, 'texto' => 'Envíos a todo el país', 'orden' => 0]);
+        $this->crearCategoria(['nombre' => 'Sillas', 'slug' => 'sillas', 'destacada_en_home' => true]);
+
+        $ofertas = $this->crearCategoria(['nombre' => 'Ofertas', 'slug' => 'ofertas', 'clave_sistema' => 'ofertas']);
+        $this->hacerPublicable($this->crearVariante('Sillón Máster', precioBase: '69000.00', color: 'Negro')->producto, $ofertas);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertViewIs('tienda.inicio')
+            ->assertSee('Verano en el jardín')
+            ->assertSee('href="/catalogo"', false)
+            ->assertSee('Envíos a todo el país')
+            ->assertSee('Sillas')
+            ->assertSee('Sillón Máster')
+            ->assertSee('$69.000')
+            ->assertSee('Comprar es fácil');
+    }
+
+    public function test_la_home_en_html_omite_las_secciones_sin_contenido(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertDontSee('aria-label="Portada"', false)
+            ->assertDontSee('Ofertas de temporada')
+            ->assertDontSee('¿Qué estás buscando?')
+            ->assertSee('Comprar es fácil');
+    }
+
+    public function test_la_home_muestra_el_contador_del_carrito_y_el_whatsapp_del_negocio(): void
+    {
+        Configuracion::query()->create(['clave' => 'contacto.whatsapp', 'valor' => '2284 123456']);
+
+        $this->withSession(['carrito' => [10 => 2, 11 => 1]])
+            ->get('/')
+            ->assertOk()
+            ->assertSee('Carrito, 3 unidades')
+            ->assertSee('https://wa.me/5492284123456', false);
+    }
+
     public function test_ofertas_excluye_agotados_y_queda_vacia_sin_ajuste_o_con_ofertas_inactiva(): void
     {
         $ofertas = $this->crearCategoria([
@@ -343,18 +390,18 @@ class ContenidoHomeTest extends TestCase
         $agotado = $this->crearVariante('Sillón agotado', disponible: false)->producto;
         $this->hacerPublicable($agotado, $ofertas);
 
-        $this->getJson('/tienda/inicio')->assertOk()->assertJsonCount(0, 'ofertas');
+        $this->getJson('/')->assertOk()->assertJsonCount(0, 'ofertas');
 
         $this->configurarAjuste('0');
-        $this->getJson('/tienda/inicio')->assertOk()->assertJsonCount(0, 'ofertas');
+        $this->getJson('/')->assertOk()->assertJsonCount(0, 'ofertas');
 
         $ofertas->forceFill(['activo' => true])->save();
-        $nombres = collect($this->getJson('/tienda/inicio')->assertOk()->assertJsonCount(8, 'ofertas')->json('ofertas'))
+        $nombres = collect($this->getJson('/')->assertOk()->assertJsonCount(8, 'ofertas')->json('ofertas'))
             ->pluck('nombre')
             ->all();
 
         $this->assertNotContains('Sillón agotado', $nombres);
-        $this->getJson('/tienda/inicio')->assertJsonPath('ofertas.0.variantes.0.precio_publicado', '100.00');
+        $this->getJson('/')->assertJsonPath('ofertas.0.variantes.0.precio_publicado', '100.00');
     }
 
     public function test_retiro_arma_el_mensaje_solo_con_las_lineas_disponibles(): void

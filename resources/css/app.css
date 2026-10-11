@@ -1,9 +1,96 @@
+@import '@fontsource-variable/archivo/wdth.css';
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+
+    --color-blanco: #ffffff;
+    --color-grafito: #26282b;
+    --color-grafito-hondo: #111214;
+    --color-naranja: #f2601f;
+    --color-naranja-claro: #fff4ec;
+    --color-celeste: #19a7ce;
+    --color-amarillo: #ffc20e;
+    --color-tinta: #4e5157;
+    --color-tinta-tenue: #6b6f75;
+    --color-niebla: #f6f7f7;
+    --color-humo: #eef1f2;
+    --color-linea: #c9ccd0;
+    --color-campo: #8a8e94;
+
+    --animate-balanceo: balanceo 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+    @keyframes balanceo {
+        0% {
+            transform: rotate(-6deg);
+        }
+        35% {
+            transform: rotate(3deg);
+        }
+        65% {
+            transform: rotate(-1.2deg);
+        }
+        100% {
+            transform: rotate(0);
+        }
+    }
+}
+
+@utility condensada {
+    font-stretch: 68%;
+    font-weight: 900;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    line-height: 0.9;
+}
+
+@utility cifras {
+    font-variant-numeric: tabular-nums;
+}
+
+@utility recorte-etiqueta {
+    clip-path: polygon(16% 0, 84% 0, 100% 7%, 100% 100%, 0 100%, 0 7%);
+}
+
+@utility recorte-etiqueta-chica {
+    clip-path: polygon(22% 0, 78% 0, 100% 14%, 100% 100%, 0 100%, 0 14%);
+}
+
+@layer base {
+    html {
+        color: var(--color-grafito);
+        background: var(--color-blanco);
+        -webkit-font-smoothing: antialiased;
+        scrollbar-color: var(--color-campo) var(--color-niebla);
+        accent-color: var(--color-grafito);
+    }
+
+    ::selection {
+        background: var(--color-amarillo);
+        color: var(--color-grafito);
+    }
+
+    a {
+        text-underline-offset: 0.3em;
+        text-decoration-thickness: 2px;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--color-celeste);
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
 }
