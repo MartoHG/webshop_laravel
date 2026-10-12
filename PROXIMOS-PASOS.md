@@ -1,6 +1,6 @@
 # Próximos pasos
 
-Nota de traspaso escrita al cerrar la sesión del 10/10/2026, para retomar desde cualquier máquina.
+Nota de traspaso para retomar desde cualquier máquina. Última actualización: 11/10/2026.
 
 ## Dónde quedó
 
@@ -10,7 +10,10 @@ Nota de traspaso escrita al cerrar la sesión del 10/10/2026, para retomar desde
   - Lienzo original: https://claude.ai/artifact/9c4rGkGfkjLkGMQb1ReAhS (privado, se abre con la cuenta del dueño).
   - Contrato de dirección: `.impeccable/surfaces/resources-views-tienda-inicio-blade-php.md`.
   - Contexto del producto para el diseño: [PRODUCT.md](PRODUCT.md).
-- **Todavía no hay vistas Blade.**
+- **Tienda pública terminada en Blade (11/10/2026):** home, catálogo con búsqueda y filtros, producto con cambio de color por htmx, carrito con htmx, ingreso, registro, recuperar contraseña, mi cuenta, checkout, pedido recibido, mis pedidos con estados en lenguaje simple y la página del link de pago con Checkout Bricks. Revisada en escritorio y a 375 px.
+- **Convención:** cada ruta responde HTML o JSON desde el mismo controlador (sección 4 del documento de decisiones). Los componentes están en `resources/views/components` y el layout en `x-layouts.tienda`.
+- **Datos de ejemplo:** `php artisan db:seed --class=DemoSeeder` (solo local) carga productos, categorías, portada y dos usuarios de prueba (ver el seeder). Las fotos de ejemplo se leen de `storage/app/demo/`, que no se versiona.
+- **Todavía sin pantallas:** el panel de administración (el backend está completo).
 
 ## Cómo se trabaja
 
@@ -20,16 +23,16 @@ Nota de traspaso escrita al cerrar la sesión del 10/10/2026, para retomar desde
 - El diseño lo hace el orquestador con las skills `impeccable`, `emil-design-eng` y `design-taste-frontend` y con la herramienta de diseño de Claude. Haiku implementa las vistas siguiendo el boceto.
 - Las reglas de negocio están en `el-refugio-decisiones.md`. Cualquier decisión nueva se anota ahí antes de implementarla.
 
-## Fase 3: pantallas (lo que sigue)
+## Fase 3: pantallas
 
-1. **Base visual en código** (orquestador):
+1. ✅ **Base visual en código** (orquestador):
    - Tokens en el `@theme` de Tailwind v4 (`resources/css/app.css`): paleta blanco, grafito #26282B, naranja #F2601F, celeste #19A7CE y amarillo #FFC20E; fuente Archivo.
    - htmx y layout Blade.
    - Componentes: etiqueta colgante, sello, botón, tarjeta de producto y franja de color.
-2. **Tienda:**
+2. ✅ **Tienda:**
    - Pantallas: home (`/`), categoría, producto, búsqueda, carrito con htmx, checkout, pedido recibido, cuenta y pedidos, login y registro, link de pago con el Brick de Mercado Pago.
    - Los controladores pasan de JSON a vistas; los servicios no cambian y los tests se adaptan.
-3. **Panel de administración:** primero el boceto, más sobrio y pensado para trabajar; después sus vistas.
+3. **Panel de administración (lo que sigue):** primero el boceto, más sobrio y pensado para trabajar; después sus vistas.
 4. **Cierre de diseño:** revisión final de impeccable y `DESIGN.md` generado por el documentador.
 5. **Fase 4, producción:** hosting, almacenamiento S3, proveedor de emails, credenciales productivas de Mercado Pago, HTTPS, worker y cron, backups. Antes, revisar que la cuenta de Mercado Pago no le cobre interés al comprador por las cuotas (sección 35).
 
