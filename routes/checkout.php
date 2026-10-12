@@ -10,4 +10,5 @@ Route::middleware(['auth', VerificarUsuarioActivo::class])->group(function (): v
     Route::post('/checkout', [CheckoutController::class, 'confirmar'])
         ->middleware(['throttle:10,1', VerificarEmailVerificado::class])
         ->name('checkout.confirmar');
+    Route::get('/checkout/recibido/{numero}', [CheckoutController::class, 'recibido'])->name('checkout.recibido');
 });

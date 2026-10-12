@@ -4,6 +4,7 @@
     'opciones' => [],
     'pista' => null,
     'valor' => null,
+    'autocompletar' => null,
 ])
 
 @php
@@ -23,6 +24,7 @@
     <select
         id="{{ $id }}"
         name="{{ $nombre }}"
+        @if ($autocompletar !== null) autocomplete="{{ $autocompletar }}" @endif
         @if ($descripcion !== '') aria-describedby="{{ $descripcion }}" @endif
         @if ($error) aria-invalid="true" @endif
         {{ $attributes->class([

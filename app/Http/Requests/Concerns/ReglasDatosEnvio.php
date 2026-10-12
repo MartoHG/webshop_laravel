@@ -16,11 +16,23 @@ trait ReglasDatosEnvio
         return [
             'provincia' => ['required', Rule::enum(Provincia::class)],
             'localidad' => ['required', 'string', 'max:100'],
-            'codigo_postal' => ['required', 'string', 'max:10', 'regex:/^(\d{4}|[A-Z]\d{4}[A-Z]{3})$/'],
+            'codigo_postal' => ['required', 'string', 'max:10', 'regex:/^[A-Z]?\d{4}([A-Z]{3})?$/'],
             'direccion' => ['required', 'string', 'max:160'],
             'numero' => ['required', 'string', 'max:10'],
             'direccion_adicional' => ['nullable', 'string', 'max:60'],
             'observaciones' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    /**
+     * El código postal se acepta como 7400, B7400 o B7400ABC (CPA completo).
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'codigo_postal.regex' => 'Escribí el código postal con sus 4 números (por ejemplo, 7400) o con letras (B7400 o B7400ABC).',
         ];
     }
 

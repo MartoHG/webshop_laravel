@@ -53,6 +53,35 @@ class CheckoutService
     }
 
     /**
+     * Datos de envío del pedido más reciente del cliente, para precargar el formulario del checkout.
+     * Devuelve null cuando todavía no hizo ningún pedido.
+     *
+     * @return ?array{provincia: string, localidad: string, codigo_postal: string, direccion: string, numero: string, direccion_adicional: ?string, observaciones: ?string}
+     */
+    public function envioDelUltimoPedido(Usuario $usuario): ?array
+    {
+        $pedido = Pedido::query()
+            ->where('usuario_id', $usuario->getKey())
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($pedido === null) {
+            return null;
+        }
+
+        return [
+            'provincia' => $pedido->provincia_envio->value,
+            'localidad' => $pedido->localidad_envio,
+            'codigo_postal' => $pedido->codigo_postal_envio,
+            'direccion' => $pedido->direccion_envio,
+            'numero' => $pedido->numero_envio,
+            'direccion_adicional' => $pedido->direccion_adicional,
+            'observaciones' => $pedido->observaciones_envio,
+        ];
+    }
+
+    /**
      * Convierte el carrito de la sesión en un pedido. La huella debe coincidir con la del resumen para
      * garantizar que el cliente confirma los mismos precios y cantidades que vio.
      *
