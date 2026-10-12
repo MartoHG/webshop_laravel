@@ -47,12 +47,20 @@
                     <label for="cantidad" class="mb-4 block text-lg font-extrabold">Cantidad</label>
                     <div data-cantidad class="inline-flex h-14 items-center rounded-md border-2 border-grafito">
                         <button type="button" data-paso="-1" aria-label="Restar uno" @disabled(! $detalle['disponible']) class="grid size-14 place-items-center text-3xl font-bold leading-none hover:bg-niebla disabled:cursor-not-allowed disabled:opacity-50">−</button>
-                        <input id="cantidad" type="number" name="cantidad" value="1" min="1" max="99" step="1" inputmode="numeric" @disabled(! $detalle['disponible']) class="h-full w-16 border-0 bg-transparent text-center text-xl font-extrabold text-grafito [appearance:textfield] disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none">
+                        <input id="cantidad" type="number" name="cantidad" value="{{ old('cantidad', 1) }}" min="1" max="99" step="1" inputmode="numeric" @disabled(! $detalle['disponible']) class="h-full w-16 border-0 bg-transparent text-center text-xl font-extrabold text-grafito [appearance:textfield] disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none">
                         <button type="button" data-paso="1" aria-label="Sumar uno" @disabled(! $detalle['disponible']) class="grid size-14 place-items-center text-3xl font-bold leading-none hover:bg-niebla disabled:cursor-not-allowed disabled:opacity-50">+</button>
                     </div>
                 </div>
 
                 <div class="flex flex-col gap-3">
+                    @error('variante_producto_id')
+                        <x-aviso tipo="error">{{ $message }}</x-aviso>
+                    @enderror
+
+                    @error('cantidad')
+                        <x-aviso tipo="error">{{ $message }}</x-aviso>
+                    @enderror
+
                     <x-boton type="submit" tamano="grande" class="w-full" :disabled="! $detalle['disponible']">
                         <x-icono nombre="carrito" class="size-[22px]" />
                         Agregar al carrito

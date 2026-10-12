@@ -46,11 +46,7 @@
                         Ingresar
                     </a>
                 @endauth
-                <a href="{{ route('carrito.mostrar') }}" aria-label="Carrito, {{ $unidadesCarrito }} {{ $unidadesCarrito === 1 ? 'unidad' : 'unidades' }}" class="relative flex h-12 items-center gap-2.5 rounded-md px-3 font-extrabold no-underline sm:bg-naranja sm:px-4 sm:text-grafito sm:hover:bg-[#e3551a]">
-                    <x-icono nombre="carrito" class="size-6 sm:size-[22px]" />
-                    <span class="hidden sm:inline">Carrito · {{ $unidadesCarrito }}</span>
-                    <span aria-hidden="true" class="absolute right-0.5 top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-naranja px-1 text-xs font-black text-grafito sm:hidden">{{ $unidadesCarrito }}</span>
-                </a>
+                @include('tienda.partials.carrito-enlace', ['unidades' => $unidadesCarrito])
 
                 <details class="group lg:hidden">
                     <summary aria-label="Abrir menú" class="grid size-12 cursor-pointer list-none place-items-center rounded-md hover:bg-white/10 [&::-webkit-details-marker]:hidden">
@@ -76,6 +72,18 @@
     </header>
 
     <main id="contenido">
+        @if (session('estado'))
+            <div class="mx-auto max-w-7xl px-4 pt-6 sm:px-10">
+                <x-aviso>{{ session('estado') }}</x-aviso>
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="mx-auto max-w-7xl px-4 pt-6 sm:px-10">
+                <x-aviso tipo="error">{{ session('error') }}</x-aviso>
+            </div>
+        @endif
+
         {{ $slot }}
     </main>
 
