@@ -21,6 +21,6 @@ class PerfilController extends Controller
             return response()->json(['mensaje' => 'Perfil actualizado.', 'usuario' => $usuario]);
         }
 
-        return redirect('/')->with('estado', 'Perfil actualizado.');
+        return back()->with('estado', 'Perfil actualizado.');
     }
 }

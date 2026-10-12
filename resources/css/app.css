@@ -20,6 +20,7 @@
     --color-humo: #eef1f2;
     --color-linea: #c9ccd0;
     --color-campo: #8a8e94;
+    --color-error: #b42318;
 
     --animate-balanceo: balanceo 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 

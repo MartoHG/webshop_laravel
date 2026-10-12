@@ -19,6 +19,6 @@ class ReenviarVerificacionController extends Controller
             return response()->json(['mensaje' => $mensaje]);
         }
 
-        return redirect('/')->with('estado', $mensaje);
+        return back()->with('estado', 'Te mandamos otro email para confirmar tu cuenta.');
     }
 }

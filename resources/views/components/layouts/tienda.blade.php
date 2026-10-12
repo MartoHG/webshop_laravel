@@ -19,36 +19,36 @@
 
     <header class="relative z-30 bg-grafito text-blanco">
         <div class="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:h-[76px] sm:px-10">
-            <a href="{{ route('tienda.inicio') }}" class="flex items-baseline gap-2.5 no-underline">
+            <a href="{{ route('tienda.inicio') }}" class="flex shrink-0 items-baseline gap-2.5 whitespace-nowrap no-underline">
                 <span class="condensada text-[28px] sm:text-[34px]">El Refugio</span>
                 <span class="hidden text-sm font-semibold text-amarillo sm:inline">Olavarría</span>
             </a>
 
-            <nav aria-label="Principal" class="ml-6 hidden gap-7 lg:flex">
+            <nav aria-label="Principal" class="ml-6 hidden gap-7 whitespace-nowrap xl:flex">
                 <a href="{{ route('catalogo.index') }}" class="py-2.5 text-[17px] font-semibold no-underline hover:underline">Muebles</a>
                 <a href="{{ route('catalogo.index', ['categoria' => 'ofertas']) }}" class="py-2.5 text-[17px] font-semibold no-underline hover:underline">Ofertas</a>
                 <a href="{{ route('tienda.inicio') }}#como-comprar" class="py-2.5 text-[17px] font-semibold no-underline hover:underline">Cómo comprar</a>
                 <a href="{{ route('tienda.inicio') }}#retiro" class="py-2.5 text-[17px] font-semibold no-underline hover:underline">Retiro en el local</a>
             </nav>
 
-            <div class="ml-auto flex items-center gap-1 sm:gap-2">
+            <div class="ml-auto flex items-center gap-1 whitespace-nowrap sm:gap-2">
                 <a href="{{ route('catalogo.index') }}#buscar" aria-label="Buscar muebles" class="grid size-12 place-items-center rounded-md hover:bg-white/10">
                     <x-icono nombre="buscar" />
                 </a>
                 @auth
-                    <a href="{{ route('cuenta.pedidos.index') }}" class="hidden h-12 items-center gap-2 rounded-md px-3 font-semibold no-underline hover:bg-white/10 sm:flex">
+                    <a href="{{ route('cuenta.mostrar') }}" class="hidden h-12 items-center gap-2 rounded-md px-3 font-semibold no-underline hover:bg-white/10 sm:flex">
                         <x-icono nombre="usuario" class="size-[22px]" />
                         Mi cuenta
                     </a>
                 @else
-                    <a href="{{ url('/iniciar-sesion') }}" class="hidden h-12 items-center gap-2 rounded-md px-3 font-semibold no-underline hover:bg-white/10 sm:flex">
+                    <a href="{{ route('login.formulario') }}" class="hidden h-12 items-center gap-2 rounded-md px-3 font-semibold no-underline hover:bg-white/10 sm:flex">
                         <x-icono nombre="usuario" class="size-[22px]" />
                         Ingresar
                     </a>
                 @endauth
                 @include('tienda.partials.carrito-enlace', ['unidades' => $unidadesCarrito])
 
-                <details class="group lg:hidden">
+                <details class="group xl:hidden">
                     <summary aria-label="Abrir menú" class="grid size-12 cursor-pointer list-none place-items-center rounded-md hover:bg-white/10 [&::-webkit-details-marker]:hidden">
                         <x-icono nombre="menu" class="size-[26px] group-open:hidden" />
                         <x-icono nombre="cerrar" class="hidden size-[26px] group-open:block" />
@@ -60,9 +60,9 @@
                             <li><a href="{{ route('tienda.inicio') }}#como-comprar" class="flex min-h-14 items-center border-b border-white/10 no-underline">Cómo comprar</a></li>
                             <li><a href="{{ route('tienda.inicio') }}#retiro" class="flex min-h-14 items-center border-b border-white/10 no-underline">Retiro en el local</a></li>
                             @auth
-                                <li><a href="{{ route('cuenta.pedidos.index') }}" class="flex min-h-14 items-center no-underline">Mi cuenta y mis pedidos</a></li>
+                                <li><a href="{{ route('cuenta.mostrar') }}" class="flex min-h-14 items-center no-underline">Mi cuenta y mis pedidos</a></li>
                             @else
-                                <li><a href="{{ url('/iniciar-sesion') }}" class="flex min-h-14 items-center no-underline">Ingresar</a></li>
+                                <li><a href="{{ route('login.formulario') }}" class="flex min-h-14 items-center no-underline">Ingresar</a></li>
                             @endauth
                         </ul>
                     </nav>

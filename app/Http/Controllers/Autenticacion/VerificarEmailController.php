@@ -13,7 +13,9 @@ class VerificarEmailController extends Controller
 {
     public function __invoke(Request $request, Usuario $usuario, string $hash, AutenticacionService $servicio): JsonResponse|RedirectResponse
     {
-        if (! $servicio->verificarEmail($usuario, $hash)) {
+        $verificadoAhora = $servicio->verificarEmail($usuario, $hash);
+
+        if (! $verificadoAhora) {
             if ($usuario->hasVerifiedEmail()) {
                 $mensaje = 'El correo ya estaba verificado.';
             } else {
@@ -27,6 +29,8 @@ class VerificarEmailController extends Controller
             return response()->json(['mensaje' => $mensaje]);
         }
 
-        return redirect('/')->with('estado', $mensaje);
+        $destino = $request->user() !== null ? route('cuenta.mostrar') : route('login.formulario');
+
+        return redirect($destino)->with('estado', $verificadoAhora ? 'Confirmaste tu email.' : 'Tu email ya estaba confirmado.');
     }
 }

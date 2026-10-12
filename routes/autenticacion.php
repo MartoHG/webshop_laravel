@@ -10,9 +10,17 @@ use App\Http\Controllers\Autenticacion\VerificarEmailController;
 use App\Http\Middleware\VerificarUsuarioActivo;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/registro', [RegistroController::class, 'mostrar'])
+    ->middleware('guest')
+    ->name('registro.formulario');
+
 Route::post('/registro', RegistroController::class)
     ->middleware('guest', 'throttle:5,1')
     ->name('registro');
+
+Route::get('/iniciar-sesion', [IniciarSesionController::class, 'mostrar'])
+    ->middleware('guest')
+    ->name('login.formulario');
 
 Route::post('/iniciar-sesion', IniciarSesionController::class)
     ->middleware('guest', 'throttle:5,1')
@@ -21,6 +29,10 @@ Route::post('/iniciar-sesion', IniciarSesionController::class)
 Route::post('/cerrar-sesion', CerrarSesionController::class)
     ->middleware('auth')
     ->name('logout');
+
+Route::get('/clave/olvide', [SolicitarRestablecimientoController::class, 'mostrar'])
+    ->middleware('guest')
+    ->name('password.request');
 
 Route::post('/clave/solicitar-restablecimiento', SolicitarRestablecimientoController::class)
     ->middleware('guest', 'throttle:5,1')

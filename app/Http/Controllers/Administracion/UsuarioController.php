@@ -20,7 +20,7 @@ class UsuarioController extends Controller
             return response()->json(['mensaje' => 'Administrador creado. Se envió una invitación para establecer la clave.', 'usuario' => $usuario], 201);
         }
 
-        return redirect('/')->with('estado', 'Administrador creado. Se envió una invitación para establecer la clave.');
+        return redirect('/')->with('estado', 'Administrador creado. Le mandamos un email para que elija su contraseña.');
     }
 
     public function cambiarEstado(CambiarEstadoUsuarioRequest $request, Usuario $usuario, UsuarioAdministracionService $servicio): JsonResponse|RedirectResponse
