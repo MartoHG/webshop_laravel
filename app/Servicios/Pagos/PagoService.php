@@ -136,11 +136,7 @@ class PagoService
      */
     public function intentoVigente(Pedido $pedido): ?array
     {
-        $pago = Pago::query()
-            ->where('pedido_id', $pedido->getKey())
-            ->whereIn('estado', EstadoIntentoPago::abiertos())
-            ->latest('id')
-            ->first();
+        $pago = $this->pagoVigente($pedido);
 
         if (! $pago instanceof Pago) {
             return null;
@@ -153,6 +149,49 @@ class PagoService
             'cuotas' => $pago->cuotas,
             'importe_cobrado' => $pago->importe_cobrado,
         ];
+    }
+
+    /**
+     * Intento que todavía puede cambiar de resultado: creado o pendiente. Null cuando no hay ninguno.
+     */
+    public function pagoVigente(Pedido $pedido): ?Pago
+    {
+        return Pago::query()
+            ->where('pedido_id', $pedido->getKey())
+            ->whereIn('estado', EstadoIntentoPago::abiertos())
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Datos que necesita la página de pago para mostrar el Brick de un intento ya creado.
+     *
+     * @return array{pago_id: int, importe: string, tipo_medio_pago: string, cuotas: int, public_key: ?string, preference_id: ?string}
+     */
+    public function configuracionDelIntento(Pago $pago): array
+    {
+        return [
+            'pago_id' => $pago->getKey(),
+            'importe' => (string) $pago->importe_cobrado,
+            'tipo_medio_pago' => $pago->tipo_medio_pago->value,
+            'cuotas' => $pago->cuotas,
+            'public_key' => config('mercadopago.public_key'),
+            'preference_id' => $pago->id_orden_mercado_pago,
+        ];
+    }
+
+    /**
+     * Detalle que dejó Mercado Pago en el último intento rechazado, para explicarlo en la página. Null si no hay.
+     */
+    public function motivoDelUltimoRechazo(Pedido $pedido): ?string
+    {
+        $detalle = Pago::query()
+            ->where('pedido_id', $pedido->getKey())
+            ->where('estado', EstadoIntentoPago::Rechazado->value)
+            ->latest('id')
+            ->value('detalle_estado');
+
+        return is_string($detalle) ? $detalle : null;
     }
 
     /**
@@ -211,14 +250,7 @@ class PagoService
             $pago->refresh();
         }
 
-        return [
-            'pago_id' => $pago->getKey(),
-            'importe' => (string) $pago->importe_cobrado,
-            'tipo_medio_pago' => $pago->tipo_medio_pago->value,
-            'cuotas' => $pago->cuotas,
-            'public_key' => config('mercadopago.public_key'),
-            'preference_id' => $pago->id_orden_mercado_pago,
-        ];
+        return $this->configuracionDelIntento($pago);
     }
 
     /**

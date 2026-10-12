@@ -132,5 +132,7 @@
             <span class="hidden sm:inline">Hablá con nosotros</span>
         </a>
     @endif
+
+    @stack('scripts')
 </body>
 </html>
