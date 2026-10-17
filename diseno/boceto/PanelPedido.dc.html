@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel — Pedido ER-2026-000014</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&amp;display=swap">
+<style>
+body{margin:0}
+.p{font-family:'Archivo',system-ui,sans-serif;color:#26282B;background:#F6F7F7;-webkit-font-smoothing:antialiased}
+.p *{box-sizing:border-box}
+.p a{color:inherit}
+.p a:focus-visible,.p button:focus-visible,.p input:focus-visible{outline:3px solid #19A7CE;outline-offset:2px;border-radius:4px}
+.cond{font-stretch:68%;font-weight:900;letter-spacing:-0.01em;text-transform:uppercase;line-height:.9}
+.etqc{clip-path:polygon(18% 0,82% 0,100% 14%,100% 100%,0 100%,0 14%)}
+.num{font-variant-numeric:tabular-nums}
+.tarjeta{background:#FFFFFF;border-radius:12px;padding:18px 16px;box-shadow:0 2px 6px rgba(38,40,43,.06)}
+.campo label{display:block;font-size:16px;font-weight:700;margin-bottom:8px}
+.campo input{font:inherit;font-size:17px;height:54px;width:100%;padding:0 14px;border:2px solid #8A8E94;border-radius:8px;background:#FFFFFF;color:#26282B}
+</style>
+</helmet>
+<div class="p" style="width:390px;min-height:2150px;position:relative">
+
+<header style="background:#26282B;color:#FFFFFF;height:56px;display:flex;align-items:center;padding:0 18px;gap:10px">
+  <span class="cond" style="font-size:24px">El Refugio</span>
+  <span style="font-size:14px;font-weight:700;color:#FFC20E">Panel</span>
+</header>
+
+<div style="padding:12px 16px 0">
+  <a href="PanelPedidos.dc.html" style="display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:16px;font-weight:700;text-decoration:none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    Pedidos
+  </a>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:6px">
+    <div style="min-width:0">
+      <h1 class="cond num" style="margin:0;font-size:34px">ER-2026-000014</h1>
+      <p style="margin:6px 0 0;font-size:19px;font-weight:800">María Fernández</p>
+      <p style="margin:2px 0 0;font-size:15px;color:#4E5157">Hecho el 17/10 a las 10:02</p>
+    </div>
+    <div style="flex:none;display:flex;flex-direction:column;align-items:center">
+      <div aria-hidden="true" style="width:2px;height:10px;background:#26282B"></div>
+      <div class="etqc" style="background:#19A7CE;padding:8px 12px 9px;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span aria-hidden="true" style="width:9px;height:9px;border-radius:50%;background:#FFFFFF;border:2.5px solid #26282B"></span>
+        <span style="font-size:14px;font-weight:800;white-space:nowrap">Para cotizar</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section aria-labelledby="titulo-paso" style="margin:20px 16px 0;border-radius:12px;background:#19A7CE;padding:18px 16px">
+  <h2 id="titulo-paso" style="margin:0;font-size:21px;font-weight:800">Próximo paso: cargá el costo del envío</h2>
+  <p style="margin:6px 0 16px;font-size:16px;line-height:1.45">Cotizá el expreso a Rosario y cargalo acá. Después lo confirmás con María por WhatsApp.</p>
+  <div style="display:flex;flex-direction:column;gap:14px;background:#FFFFFF;border-radius:10px;padding:16px">
+    <div class="campo"><label for="expreso">Expreso</label><input id="expreso" value="Vía Cargo"></div>
+    <div class="campo"><label for="costo">Costo del envío</label><input id="costo" class="num" value="$18.500" inputmode="decimal"></div>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:6px;background:#26282B;color:#FFFFFF;text-decoration:none;font-weight:800;font-size:17px">Guardar costo</a>
+  </div>
+  <p style="margin:12px 0 0;font-size:15px;line-height:1.4">El total con envío queda en <strong class="num">$245.500</strong>.</p>
+</section>
+
+<section aria-labelledby="titulo-cliente" class="tarjeta" style="margin:16px 16px 0">
+  <h2 id="titulo-cliente" style="margin:0 0 12px;font-size:19px;font-weight:800">Cliente</h2>
+  <dl style="margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:16px">
+    <dt style="color:#4E5157">WhatsApp</dt><dd class="num" style="margin:0;font-weight:700">341 555-1234</dd>
+    <dt style="color:#4E5157">Email</dt><dd style="margin:0;font-weight:700;overflow-wrap:anywhere">maria@ejemplo.com</dd>
+    <dt style="color:#4E5157">DNI</dt><dd class="num" style="margin:0;font-weight:700">30.123.456</dd>
+  </dl>
+  <a href="#" style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;min-height:50px;border-radius:6px;border:2px solid #26282B;text-decoration:none;font-weight:800;font-size:16px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"></path></svg>
+    Abrir chat de WhatsApp
+  </a>
+</section>
+
+<section aria-labelledby="titulo-envio" class="tarjeta" style="margin:16px 16px 0">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+    <h2 id="titulo-envio" style="margin:0;font-size:19px;font-weight:800">Envío</h2>
+    <a href="#" style="font-size:15px;font-weight:700;text-underline-offset:4px">Corregir</a>
+  </div>
+  <p style="margin:10px 0 0;font-size:16px;line-height:1.5">Av. Pellegrini 1234, 3° B<br>Rosario, Santa Fe · CP S2000</p>
+  <p style="margin:8px 0 0;font-size:15px;color:#4E5157;line-height:1.45">«Entre Oroño y Balcarce, de 9 a 13.»</p>
+</section>
+
+<section aria-labelledby="titulo-productos" class="tarjeta" style="margin:16px 16px 0">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+    <h2 id="titulo-productos" style="margin:0;font-size:19px;font-weight:800">Productos</h2>
+    <a href="#" style="font-size:15px;font-weight:700;text-underline-offset:4px">Editar</a>
+  </div>
+  <ul style="list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:16px">
+    <li style="display:flex;justify-content:space-between;gap:12px"><span>2 × Sillón Gran California, blanco</span><span class="num" style="font-weight:700">$158.000</span></li>
+    <li style="display:flex;justify-content:space-between;gap:12px"><span>1 × Sillón Máster reforzado, negro</span><span class="num" style="font-weight:700">$69.000</span></li>
+  </ul>
+  <div style="margin-top:12px;padding-top:12px;border-top:2px dashed #C9CCD0;display:flex;flex-direction:column;gap:6px;font-size:16px">
+    <div style="display:flex;justify-content:space-between"><span>Productos</span><span class="num" style="font-weight:800">$227.000</span></div>
+    <div style="display:flex;justify-content:space-between;color:#4E5157"><span>Envío</span><span>Falta cargar</span></div>
+  </div>
+</section>
+
+<section aria-labelledby="titulo-historial" class="tarjeta" style="margin:16px 16px 0">
+  <h2 id="titulo-historial" style="margin:0 0 12px;font-size:19px;font-weight:800">Historial</h2>
+  <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:15px;line-height:1.4">
+    <li style="display:flex;gap:12px"><span class="num" style="flex:none;width:78px;color:#4E5157">Hoy 10:40</span><span><strong>María contestó.</strong> Lo marcaste vos.</span></li>
+    <li style="display:flex;gap:12px"><span class="num" style="flex:none;width:78px;color:#4E5157">Hoy 10:15</span><span>Le escribiste por WhatsApp.</span></li>
+    <li style="display:flex;gap:12px"><span class="num" style="flex:none;width:78px;color:#4E5157">Hoy 10:02</span><span>María hizo el pedido.</span></li>
+  </ol>
+</section>
+
+<section aria-labelledby="titulo-mas" style="margin:22px 16px 0;padding-bottom:40px">
+  <h2 id="titulo-mas" style="margin:0 0 10px;font-size:17px;font-weight:800;color:#4E5157">Otras acciones</h2>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <a href="#" style="display:flex;align-items:center;min-height:50px;padding:0 16px;border-radius:8px;background:#FFFFFF;text-decoration:none;font-size:16px;font-weight:700">Mandar email «No pudimos contactarte»</a>
+    <a href="#" style="display:flex;align-items:center;min-height:50px;padding:0 16px;border-radius:8px;background:#FFFFFF;text-decoration:none;font-size:16px;font-weight:700">Mandar email de recordatorio</a>
+    <a href="#" style="display:flex;align-items:center;min-height:50px;padding:0 16px;border-radius:8px;background:#FFFFFF;text-decoration:none;font-size:16px;font-weight:700;color:#B42318">Cancelar el pedido…</a>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2150}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

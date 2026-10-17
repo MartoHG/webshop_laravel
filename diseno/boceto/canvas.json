@@ -5,7 +5,8 @@
   "launch": { "view": "canvas" },
   "pages": [
     { "id": "home", "name": "Home" },
-    { "id": "compra", "name": "Compra" }
+    { "id": "compra", "name": "Compra" },
+    { "id": "panel", "name": "Panel" }
   ],
   "boards": {
     "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 4300, "expand": "fill", "title": "Home — escritorio", "page": "home" },
@@ -14,13 +15,20 @@
     "Carrito.dc.html": { "x": 470, "y": 0, "w": 390, "h": 1300, "title": "2 · Carrito", "radius": 28, "page": "compra" },
     "Checkout.dc.html": { "x": 940, "y": 0, "w": 390, "h": 1960, "title": "3 · Confirmar pedido", "radius": 28, "page": "compra" },
     "Confirmado.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 1100, "title": "4 · Pedido recibido", "radius": 28, "page": "compra" },
-    "Pago.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 1640, "title": "5 · Link de pago", "radius": 28, "page": "compra" }
+    "Pago.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 1640, "title": "5 · Link de pago", "radius": 28, "page": "compra" },
+    "PanelPedidos.dc.html": { "x": 0, "y": 0, "w": 390, "h": 1300, "title": "1 · Pedidos (bandeja)", "radius": 28, "page": "panel" },
+    "PanelPedido.dc.html": { "x": 470, "y": 0, "w": 390, "h": 2150, "title": "2 · Detalle del pedido", "radius": 28, "page": "panel" },
+    "PanelProductos.dc.html": { "x": 940, "y": 0, "w": 390, "h": 1250, "title": "3 · Productos", "radius": 28, "page": "panel" },
+    "PanelProducto.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 2050, "title": "4 · Editar producto", "radius": 28, "page": "panel" },
+    "PanelMas.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 1150, "title": "5 · Más", "radius": 28, "page": "panel" }
   },
-  "order": ["Main.dc.html", "Celular.dc.html", "Producto.dc.html", "Carrito.dc.html", "Checkout.dc.html", "Confirmado.dc.html", "Pago.dc.html"],
+  "order": ["Main.dc.html", "Celular.dc.html", "Producto.dc.html", "Carrito.dc.html", "Checkout.dc.html", "Confirmado.dc.html", "Pago.dc.html", "PanelPedidos.dc.html", "PanelPedido.dc.html", "PanelProductos.dc.html", "PanelProducto.dc.html", "PanelMas.dc.html"],
   "notes": {
     "fotos": { "x": 1990, "y": 0, "w": 300, "text": "Fotos y precios de ejemplo, tomados de los posteos de @elrefugio.olav. El negocio va a cargar los suyos desde el panel.", "fill": "orange", "page": "home" },
     "titulocompra": { "x": 0, "y": -300, "text": "Flujo de compra en el celular", "kind": "title1", "maxW": 2270, "page": "compra" },
-    "ejemplo": { "x": 2350, "y": 0, "w": 300, "text": "Precios, costo de envío y porcentajes de cuotas de EJEMPLO para mostrar el flujo. Los porcentajes reales los configura el dueño en el panel.", "fill": "orange", "page": "compra" }
+    "ejemplo": { "x": 2350, "y": 0, "w": 300, "text": "Precios, costo de envío y porcentajes de cuotas de EJEMPLO para mostrar el flujo. Los porcentajes reales los configura el dueño en el panel.", "fill": "orange", "page": "compra" },
+    "titulopanel": { "x": 0, "y": -300, "text": "Panel de administración en el celular", "kind": "title1", "maxW": 2270, "page": "panel" },
+    "ejemplopanel": { "x": 2350, "y": 0, "w": 300, "text": "Clientes, pedidos y montos de EJEMPLO. La bandeja agrupa los pedidos por lo que les falta: contactar, cotizar, esperando pago y despachar.", "fill": "orange", "page": "panel" }
   },
   "designSystems": []
 }

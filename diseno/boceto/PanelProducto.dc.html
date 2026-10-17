@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel — Editar producto</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&amp;display=swap">
+<style>
+body{margin:0}
+.p{font-family:'Archivo',system-ui,sans-serif;color:#26282B;background:#F6F7F7;-webkit-font-smoothing:antialiased}
+.p *{box-sizing:border-box}
+.p a{color:inherit}
+.p a:focus-visible,.p button:focus-visible,.p input:focus-visible,.p textarea:focus-visible{outline:3px solid #19A7CE;outline-offset:2px;border-radius:4px}
+.cond{font-stretch:68%;font-weight:900;letter-spacing:-0.01em;text-transform:uppercase;line-height:.9}
+.num{font-variant-numeric:tabular-nums}
+.tarjeta{background:#FFFFFF;border-radius:12px;padding:18px 16px;box-shadow:0 2px 6px rgba(38,40,43,.06)}
+.campo label{display:block;font-size:16px;font-weight:700;margin-bottom:8px}
+.campo input,.campo textarea{font:inherit;font-size:17px;height:54px;width:100%;padding:0 14px;border:2px solid #8A8E94;border-radius:8px;background:#FFFFFF;color:#26282B}
+.campo textarea{height:104px;padding:12px 14px;line-height:1.45}
+.interruptor{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:48px}
+.interruptor span.texto{font-size:16px;font-weight:700}
+.palanca{flex:none;width:54px;height:32px;border-radius:999px;position:relative}
+.palanca::after{content:'';position:absolute;top:4px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.on{background:#26282B}.on::after{right:4px}
+.off{background:#C9CCD0}.off::after{left:4px}
+.chipcat{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:700;text-decoration:none}
+</style>
+</helmet>
+<div class="p" style="width:390px;min-height:2050px;position:relative;padding-bottom:96px">
+
+<header style="background:#26282B;color:#FFFFFF;height:56px;display:flex;align-items:center;padding:0 18px;gap:10px">
+  <span class="cond" style="font-size:24px">El Refugio</span>
+  <span style="font-size:14px;font-weight:700;color:#FFC20E">Panel</span>
+</header>
+
+<div style="padding:12px 16px 0">
+  <a href="PanelProductos.dc.html" style="display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:16px;font-weight:700;text-decoration:none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    Productos
+  </a>
+  <h1 class="cond" style="margin:6px 0 0;font-size:40px">Sillón Gran California</h1>
+</div>
+
+<section aria-label="Visibilidad" class="tarjeta" style="margin:16px 16px 0">
+  <div class="interruptor">
+    <span class="texto">Se ve en la tienda</span>
+    <button type="button" role="switch" aria-checked="true" aria-label="Se ve en la tienda" class="palanca on" style="border:0"></button>
+  </div>
+  <ul style="list-style:none;margin:10px 0 0;padding:12px 0 0;border-top:1px solid #EEF1F2;display:flex;flex-direction:column;gap:6px;font-size:15px;color:#4E5157">
+    <li style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#26282B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Tiene categoría</li>
+    <li style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#26282B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Tiene foto principal</li>
+    <li style="display:flex;gap:8px;align-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#26282B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Tiene un color a la venta</li>
+  </ul>
+</section>
+
+<section aria-labelledby="titulo-fotos" class="tarjeta" style="margin:16px 16px 0">
+  <h2 id="titulo-fotos" style="margin:0 0 12px;font-size:19px;font-weight:800">Fotos</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+    <div style="position:relative;aspect-ratio:1/1;border-radius:8px;overflow:hidden;background:#EEF1F2"><img src="/_blob/74a60673d3082e304b8bb7e1148df8b2" alt="Foto principal: sillones blancos en un patio" style="width:100%;height:100%;object-fit:cover;display:block"><span style="position:absolute;left:6px;bottom:6px;padding:2px 8px;border-radius:999px;background:#FFC20E;font-size:12px;font-weight:900">Principal</span></div>
+    <div style="aspect-ratio:1/1;border-radius:8px;overflow:hidden;background:#FFFFFF;border:1px solid #EEF1F2"><img src="/_blob/3016ede7182a2f2dce755af09edb6c58" alt="Sillón azul" style="width:100%;height:100%;object-fit:contain;display:block"></div>
+    <a href="#" style="aspect-ratio:1/1;border-radius:8px;border:2px dashed #8A8E94;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:14px;font-weight:700;color:#4E5157">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      Agregar
+    </a>
+  </div>
+  <p style="margin:10px 0 0;font-size:14px;color:#4E5157">Podés subir fotos sacadas con el celular. Las achicamos solas.</p>
+</section>
+
+<section aria-labelledby="titulo-datos" class="tarjeta" style="margin:16px 16px 0;display:flex;flex-direction:column;gap:16px">
+  <h2 id="titulo-datos" style="margin:0;font-size:19px;font-weight:800">Datos</h2>
+  <div class="campo"><label for="nombre">Nombre</label><input id="nombre" value="Sillón Gran California"></div>
+  <div class="campo"><label for="descripcion">Descripción</label><textarea id="descripcion">Sillón de plástico Mascardi, estilo Adirondack, para patio o jardín.</textarea></div>
+</section>
+
+<section aria-labelledby="titulo-categorias" class="tarjeta" style="margin:16px 16px 0">
+  <h2 id="titulo-categorias" style="margin:0 0 12px;font-size:19px;font-weight:800">Categorías</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <a href="#" aria-pressed="true" class="chipcat" style="background:#26282B;color:#FFFFFF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Sillones</a>
+    <a href="#" aria-pressed="true" class="chipcat" style="background:#FFC20E"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Ofertas</a>
+    <a href="#" aria-pressed="false" class="chipcat" style="background:#FFFFFF;border:2px solid #C9CCD0">Sillas</a>
+    <a href="#" aria-pressed="false" class="chipcat" style="background:#FFFFFF;border:2px solid #C9CCD0">Reposeras</a>
+    <a href="#" aria-pressed="false" class="chipcat" style="background:#FFFFFF;border:2px solid #C9CCD0">Juegos de living</a>
+  </div>
+</section>
+
+<section aria-labelledby="titulo-colores" style="margin:24px 16px 0">
+  <h2 id="titulo-colores" style="margin:0 0 12px;font-size:19px;font-weight:800">Colores y precios</h2>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="tarjeta" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="width:48px;height:48px;border-radius:8px;overflow:hidden;background:#EEF1F2;flex:none"><img src="/_blob/74a60673d3082e304b8bb7e1148df8b2" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></span>
+        <span style="flex:1;font-size:18px;font-weight:800">Blanco</span>
+        <span style="display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:999px;background:#19A7CE;font-size:13px;font-weight:800">A la venta</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <div class="campo"><label for="precio-blanco">Precio base</label><input id="precio-blanco" class="num" value="$79.000" inputmode="decimal"></div>
+        <div class="campo"><label for="sku-blanco">Código</label><input id="sku-blanco" value="CAL-BLA"></div>
+      </div>
+      <p style="margin:-4px 0 0;font-size:14px;color:#4E5157">En la tienda se ve a <strong class="num">$86.110</strong> (con el ajuste del 9%).</p>
+      <div class="interruptor" style="border-top:1px solid #EEF1F2;padding-top:6px"><span class="texto">Hay stock</span><button type="button" role="switch" aria-checked="true" aria-label="Blanco: hay stock" class="palanca on" style="border:0"></button></div>
+    </div>
+    <div class="tarjeta" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="width:48px;height:48px;border-radius:8px;overflow:hidden;background:#FFFFFF;border:1px solid #EEF1F2;flex:none"><img src="/_blob/3016ede7182a2f2dce755af09edb6c58" alt="" style="width:100%;height:100%;object-fit:contain;display:block"></span>
+        <span style="flex:1;font-size:18px;font-weight:800">Azul</span>
+        <span style="display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:999px;background:#26282B;color:#FFFFFF;font-size:13px;font-weight:800">Agotado</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <div class="campo"><label for="precio-azul">Precio base</label><input id="precio-azul" class="num" value="$79.000" inputmode="decimal"></div>
+        <div class="campo"><label for="sku-azul">Código</label><input id="sku-azul" value="CAL-AZU"></div>
+      </div>
+      <div class="interruptor" style="border-top:1px solid #EEF1F2;padding-top:6px"><span class="texto">Hay stock</span><button type="button" role="switch" aria-checked="false" aria-label="Azul: hay stock" class="palanca off" style="border:0"></button></div>
+    </div>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:8px;border:2px dashed #8A8E94;text-decoration:none;font-size:16px;font-weight:800">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      Agregar color
+    </a>
+  </div>
+</section>
+
+<div style="position:absolute;left:0;right:0;bottom:0;padding:12px 16px 16px;background:#FFFFFF;border-top:1px solid #C9CCD0">
+  <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:56px;border-radius:6px;background:#26282B;color:#FFFFFF;text-decoration:none;font-weight:800;font-size:18px">Guardar cambios</a>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2050}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

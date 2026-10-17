@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Panel — Productos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&amp;display=swap">
+<style>
+body{margin:0}
+.p{font-family:'Archivo',system-ui,sans-serif;color:#26282B;background:#F6F7F7;-webkit-font-smoothing:antialiased}
+.p *{box-sizing:border-box}
+.p a{color:inherit}
+.p a:focus-visible,.p button:focus-visible,.p input:focus-visible{outline:3px solid #19A7CE;outline-offset:2px;border-radius:4px}
+.cond{font-stretch:68%;font-weight:900;letter-spacing:-0.01em;text-transform:uppercase;line-height:.9}
+.num{font-variant-numeric:tabular-nums}
+.fila{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;background:#FFFFFF;border-radius:12px;text-decoration:none;box-shadow:0 2px 6px rgba(38,40,43,.06)}
+.foto{width:64px;height:64px;border-radius:8px;overflow:hidden;background:#EEF1F2}
+.foto img{width:100%;height:100%;object-fit:cover;display:block}
+.chip{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:800;white-space:nowrap}
+.filtro{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap}
+</style>
+</helmet>
+<div class="p" style="width:390px;min-height:1250px;position:relative">
+
+<header style="background:#26282B;color:#FFFFFF;height:56px;display:flex;align-items:center;padding:0 18px;gap:10px">
+  <span class="cond" style="font-size:24px">El Refugio</span>
+  <span style="font-size:14px;font-weight:700;color:#FFC20E">Panel</span>
+</header>
+
+<div style="padding:22px 16px 0;display:flex;align-items:center;justify-content:space-between;gap:12px">
+  <h1 class="cond" style="margin:0;font-size:44px">Productos</h1>
+  <a href="PanelProducto.dc.html" style="display:inline-flex;align-items:center;gap:6px;min-height:48px;padding:0 16px;border-radius:6px;background:#F2601F;color:#26282B;text-decoration:none;font-weight:900;font-size:16px">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+    Nuevo
+  </a>
+</div>
+
+<form role="search" style="padding:16px 16px 0">
+  <label for="buscar" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Buscar productos</label>
+  <div style="position:relative">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4E5157" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="position:absolute;left:14px;top:17px"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+    <input id="buscar" placeholder="Buscar por nombre o código" style="font:inherit;font-size:17px;height:54px;width:100%;padding:0 14px 0 44px;border:2px solid #8A8E94;border-radius:8px;background:#FFFFFF;color:#26282B">
+  </div>
+</form>
+
+<nav aria-label="Filtrar" style="padding:14px 16px 0;display:flex;gap:8px;overflow-x:auto">
+  <a href="#" aria-current="page" class="filtro" style="background:#26282B;color:#FFFFFF">Todos · 8</a>
+  <a href="#" class="filtro" style="background:#FFFFFF;border:2px solid #C9CCD0">Agotados · 1</a>
+  <a href="#" class="filtro" style="background:#FFFFFF;border:2px solid #C9CCD0">Ocultos · 0</a>
+</nav>
+
+<ul style="list-style:none;margin:16px 0 0;padding:0 16px;display:flex;flex-direction:column;gap:10px">
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/74a60673d3082e304b8bb7e1148df8b2" alt=""></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Sillón Gran California</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">2 colores · <span class="num">$79.000</span></span></span>
+    <span class="chip" style="background:#26282B;color:#FFFFFF">1 agotado</span>
+  </a></li>
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/f93b4f7d01efd7f3576aaa8dd1c49c00" alt=""></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Juego de living símil ratán</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">Grafito · <span class="num">$299.000</span></span></span>
+    <span class="chip" style="background:#FFC20E">Oferta</span>
+  </a></li>
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/4f7ed36e8738375c4c62e3ce616caf28" alt=""></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Reposera rotomoldeada</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">3 colores · <span class="num">$189.000</span></span></span>
+    <span class="chip" style="background:#FFC20E">Oferta</span>
+  </a></li>
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/0c3a3e40e4171e35505664bf14ed1813" alt=""></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Sillón Máster reforzado</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">Negro · <span class="num">$69.000</span></span></span>
+    <span class="chip" style="background:#FFC20E">Oferta</span>
+  </a></li>
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/4ddc6fa9acd1ed93ffce16625697148f" alt=""></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Silla Aruba Mascardi (pack x 4)</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">Grafito · <span class="num">$239.000</span></span></span>
+    <span class="chip" style="background:#FFC20E">Oferta</span>
+  </a></li>
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/783191a2818a30bcc3611e5ad3d2f5ed" alt="" style="object-fit:contain;background:#FFFFFF"></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Sillón símil ratán</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">Grafito · <span class="num">$85.000</span></span></span>
+    <span></span>
+  </a></li>
+  <li><a href="PanelProducto.dc.html" class="fila">
+    <span class="foto"><img src="/_blob/374f59bc887f156903144a484aff5fa3" alt="" style="object-fit:contain;background:#FFFFFF"></span>
+    <span style="min-width:0"><span style="display:block;font-size:17px;font-weight:800;line-height:1.25">Silla símil ratán con apoyabrazos</span><span style="display:block;margin-top:3px;font-size:14px;color:#4E5157">Grafito · <span class="num">$45.000</span></span></span>
+    <span></span>
+  </a></li>
+</ul>
+
+<nav aria-label="Secciones del panel" style="position:absolute;left:0;right:0;bottom:0;height:68px;background:#FFFFFF;border-top:1px solid #C9CCD0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))">
+  <a href="PanelPedidos.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:13px;font-weight:600;color:#4E5157;position:relative">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+    Pedidos
+    <span style="position:absolute;top:8px;left:calc(50% + 8px);min-width:20px;height:20px;border-radius:10px;background:#F2601F;color:#26282B;font-size:12px;font-weight:900;display:grid;place-items:center">4</span>
+  </a>
+  <a href="PanelProductos.dc.html" aria-current="page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:13px;font-weight:800;color:#26282B;box-shadow:inset 0 3px 0 #F2601F">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"></rect><rect x="13" y="4" width="7" height="7" rx="1.5"></rect><rect x="4" y="13" width="7" height="7" rx="1.5"></rect><rect x="13" y="13" width="7" height="7" rx="1.5"></rect></svg>
+    Productos
+  </a>
+  <a href="#" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:13px;font-weight:600;color:#4E5157">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12l9-9h8v8l-9 9z"></path><circle cx="15.5" cy="8.5" r="1.5"></circle></svg>
+    Precios
+  </a>
+  <a href="PanelMas.dc.html" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:13px;font-weight:600;color:#4E5157">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+    Más
+  </a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1250}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

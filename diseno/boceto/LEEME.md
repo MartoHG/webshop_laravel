@@ -4,5 +4,6 @@ Boceto de la tienda aprobado el 2026-10-10. Lienzo original (privado): https://c
 
 - `Main.dc.html`: home de escritorio. `Celular.dc.html`: home en celular.
 - `Producto`, `Carrito`, `Checkout`, `Confirmado`, `Pago`: flujo de compra en celular.
+- `PanelPedidos`, `PanelPedido`, `PanelProductos`, `PanelProducto`, `PanelMas`: panel de administración en celular (estructura «Bandeja de tareas», elegida el 17/10/2026). Contrato: `.impeccable/surfaces/resources-views-administracion-inicio-blade-php.md`.
 
 Son la referencia visual para las vistas Blade. Las imágenes (`/_blob/...`) solo cargan dentro del lienzo. Los precios, porcentajes y costos de envío son de ejemplo. El contrato de dirección está en `.impeccable/surfaces/`.
