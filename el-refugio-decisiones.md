@@ -1127,6 +1127,8 @@ link de pago (/pago/{token_pago})
 
 - Si el medio de pago o las cuotas recibidos no coinciden con el intento, se rechaza sin llamar a Mercado Pago.
 - El pago con dinero en cuenta usa una preferencia restringida a ese medio y a 1 pago; el webhook verifica igualmente medio, cuotas e importe.
+- La preferencia de dinero en cuenta vence a los 30 minutos de creada y excluye todos los demás tipos de pago, incluidas las cuotas sin tarjeta. Pasado ese plazo, la página vuelve a ofrecer las modalidades y el cliente elige de nuevo.
+- Al volver de Mercado Pago, el backend consulta a la API el pago que indica la dirección y aplica su estado por el mismo camino que el webhook, solo si corresponde a ese pedido. Si la API no responde, el intento queda pendiente hasta que lo resuelva la conciliación. La dirección nunca marca un pago como pagado.
 - La integración usa el cliente HTTP de Laravel, para poder simular Mercado Pago en los tests.
 
 ## Link de pago
@@ -1211,8 +1213,12 @@ cliente paga
 - Un pago aprobado nunca se rechaza ni se ignora. Si llega para un pedido cancelado o reemplazado, o si el pedido ya tenía otro pago aprobado, el intento queda en `requiere_revision`, el pedido no cambia y se avisa al administrador. La devolución, si corresponde, se hace manualmente desde Mercado Pago.
 - Mientras haya un pago en revisión, el pedido no admite nuevos intentos de pago ni cancelación. El administrador lo resuelve desde el panel con una nota obligatoria: **aceptar** el pago (el pedido pasa a pagado, si no está cancelado ni tiene otro pago aprobado) o **descartarlo** después de devolver la plata en Mercado Pago (el link de pago vuelve a funcionar). Ambas decisiones quedan auditadas.
 - Un proceso automático revisa cada 15 minutos los pagos que siguen pendientes (por ejemplo, por un corte de conexión) y les aplica el estado que informa Mercado Pago.
+- Ese proceso también revisa los intentos de dinero en cuenta mientras su preferencia puede tener pagos, porque esos intentos no pasan por pendiente antes del aviso. Pasado ese plazo sin pago, el intento se cancela.
 - Si después de 30 minutos Mercado Pago no tiene ningún pago para un intento pendiente, el intento se cancela y el link de pago vuelve a funcionar.
 - Si llega tarde un pago aprobado de un intento cancelado o rechazado, se acepta cuando el pedido todavía puede pagarse y los datos coinciden; si no, queda en revisión.
+- Un reembolso (también parcial), un contracargo o una mediación abren revisión y avisan al administrador una sola vez, y solo si el pago estaba aprobado. Sobre un pago descartado, rechazado o cancelado, solo quedan en la auditoría y el pedido no se bloquea. Las devoluciones se resuelven por fuera, por WhatsApp.
+- Lo que el administrador ya resolvió no se reabre: un aviso repetido con el mismo motivo, o un aviso sobre un pago que descartó, solo queda en la auditoría.
+- Si el procesamiento de un aviso de Mercado Pago falla después de todos sus reintentos, se avisa a los administradores.
 
 ---
 
