@@ -7,6 +7,7 @@ use App\Notifications\VerificarEmail;
 use Database\Factories\UsuarioFactory;
 use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -46,6 +47,12 @@ class Usuario extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'activo' => 'boolean',
         ];
+    }
+
+    /** @param  Builder<Usuario>  $consulta */
+    public function scopeAdministradoresActivos(Builder $consulta): void
+    {
+        $consulta->where('rol', 'administrador')->where('activo', true);
     }
 
     public function setDniAttribute(string $dni): void

@@ -1,6 +1,7 @@
 @use('App\Servicios\Precios\FormatoMoneda')
 @use('App\View\OpcionPagoVisible')
-<x-layouts.tienda titulo="Pagá tu pedido">
+@use('App\Servicios\Pagos\PagoService')
+<x-layouts.tienda :titulo="$titulo">
     @if ($admitePago && $mercadoPagoConfigurado)
         @push('scripts')
             <script src="https://sdk.mercadopago.com/js/v2"></script>
@@ -9,7 +10,7 @@
     @endif
 
     <section aria-labelledby="titulo-pago" class="mx-auto max-w-2xl px-4 pb-24 pt-8 sm:px-10 sm:pt-12">
-        <h1 id="titulo-pago" class="condensada text-[52px] sm:text-[72px]">Pagá tu pedido</h1>
+        <h1 id="titulo-pago" class="condensada text-[52px] sm:text-[72px]">{{ $titulo }}</h1>
         <p class="cifras mt-2 text-lg font-bold [overflow-wrap:anywhere]">{{ $resumen['numero'] }} · {{ $resumen['nombre_cliente'] }}</p>
 
         <section aria-labelledby="titulo-tu-pedido" class="mt-6 rounded-[10px] bg-niebla p-5 sm:p-6">
@@ -53,6 +54,10 @@
                 class="mt-10"
             >
                 @csrf
+
+                @if ($preferenciaVencida)
+                    <x-aviso tipo="error" class="mb-6">Pasaron más de {{ PagoService::MINUTOS_VIGENCIA_PREFERENCIA }} minutos y el pago con tu cuenta de Mercado Pago venció. Elegí de nuevo cómo querés pagar.</x-aviso>
+                @endif
 
                 <fieldset class="min-w-0">
                     <legend class="condensada text-[40px] sm:text-[48px]">Elegí cómo pagar</legend>

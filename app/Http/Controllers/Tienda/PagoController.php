@@ -165,7 +165,7 @@ class PagoController extends Controller
 
     /**
      * @return array{
-     *     token: string, pedido: Pedido, resumen: array<string, mixed>, admitePago: bool,
+     *     token: string, pedido: Pedido, titulo: string, resumen: array<string, mixed>, admitePago: bool, preferenciaVencida: bool,
      *     opciones: list<array{regla_id: int, tipo_medio_pago: string, cuotas: int, importe: string}>, seleccionada: ?int,
      *     brick: ?array<string, mixed>, resultado: ?array<string, mixed>, whatsappUrl: ?string, mercadoPagoConfigurado: bool
      * }
@@ -176,24 +176,29 @@ class PagoController extends Controller
         $pagoVigente = $servicio->pagoVigente($pedido);
         $preferenciaVencida = $pagoVigente !== null && $servicio->preferenciaVencida($pagoVigente);
         $intentoCreado = $pagoVigente !== null && $pagoVigente->estado === EstadoIntentoPago::Creado && ! $preferenciaVencida;
-        $admitePago = $pedido->estado_pago !== EstadoPago::Pagado;
-        $muestraResultado = ! $admitePago
+        $enRevision = $servicio->hayPagoEnRevision($pedido);
+        $admitePago = $pedido->estado_pago !== EstadoPago::Pagado && ! $enRevision;
+        $muestraResultado = $enRevision
+            || $pedido->estado_pago === EstadoPago::Pagado
             || $pedido->estado_pago === EstadoPago::Pendiente
             || ($regresoRechazado && $pedido->estado_pago === EstadoPago::Habilitado && $pagoVigente === null);
+        $resultado = $muestraResultado
+            ? $this->datosDelResultado($token, $pedido, $resumen['estado_pago'], $resumen['intento_vigente'], $servicio, $contacto, $enRevision)
+            : null;
 
         return [
             'token' => $token,
             'pedido' => $pedido,
+            'titulo' => ($resultado['clave'] ?? null) === 'aprobado' ? 'Recibimos tu pago' : 'Pagá tu pedido',
             'resumen' => $resumen,
             'admitePago' => $admitePago,
+            'preferenciaVencida' => $admitePago && $preferenciaVencida,
             'opciones' => $this->ordenDeLaPagina($resumen['opciones']),
             'seleccionada' => $admitePago && ! $preferenciaVencida
                 ? $this->opcionDelIntento($resumen['opciones'], $resumen['intento_vigente'])
                 : null,
             'brick' => $admitePago && $intentoCreado ? $this->datosDelBrick($token, $servicio->configuracionDelIntento($pagoVigente)) : null,
-            'resultado' => $muestraResultado
-                ? $this->datosDelResultado($token, $pedido, $resumen['estado_pago'], $resumen['intento_vigente'], $servicio, $contacto)
-                : null,
+            'resultado' => $resultado,
             'whatsappUrl' => $contacto->publico()['whatsapp_url'],
             'mercadoPagoConfigurado' => $this->clavePublica() !== null,
         ];
@@ -203,9 +208,9 @@ class PagoController extends Controller
      * @param  ?array{estado: string}  $intentoVigente
      * @return array<string, mixed>
      */
-    private function datosDelResultado(string $token, Pedido $pedido, string $estadoPago, ?array $intentoVigente, PagoService $servicio, ContactoService $contacto): array
+    private function datosDelResultado(string $token, Pedido $pedido, string $estadoPago, ?array $intentoVigente, PagoService $servicio, ContactoService $contacto, ?bool $enRevision = null): array
     {
-        $visible = EstadoVisiblePago::paraPago($estadoPago, $intentoVigente);
+        $visible = EstadoVisiblePago::paraPago($estadoPago, $intentoVigente, $enRevision ?? $servicio->hayPagoEnRevision($pedido));
 
         return [
             ...$visible,

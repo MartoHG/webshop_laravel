@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Usuario;
+use App\Notifications\Pedidos\AlertaAvisoMercadoPagoFallido;
 use App\Servicios\Pagos\ErrorMercadoPago;
 use App\Servicios\Pagos\MercadoPagoCliente;
 use App\Servicios\Pagos\PagoService;
@@ -11,6 +13,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 class ProcesarNotificacionMercadoPago implements ShouldQueue
 {
@@ -46,5 +50,26 @@ class ProcesarNotificacionMercadoPago implements ShouldQueue
         }
 
         $pagos->aplicarPagoMercadoPago($pagoMp);
+    }
+
+    /**
+     * El registro no lleva el mensaje de la excepción: el de una QueryException trae el SQL y puede tener datos personales.
+     */
+    public function failed(?Throwable $excepcion): void
+    {
+        $contexto = [
+            'id_pago_mercado_pago' => $this->idPago,
+            'excepcion' => $excepcion !== null ? $excepcion::class : null,
+        ];
+
+        if ($excepcion instanceof ErrorMercadoPago) {
+            $contexto['status'] = $excepcion->status;
+        }
+
+        Log::error('No se pudo procesar un aviso de Mercado Pago después de todos los reintentos.', $contexto);
+
+        $administradores = Usuario::query()->administradoresActivos()->get();
+
+        Notification::send($administradores, new AlertaAvisoMercadoPagoFallido($this->idPago));
     }
 }

@@ -31,6 +31,8 @@ class AlertaPagoEnRevision extends NotificacionPedido
             'id_distinto' => 'Mercado Pago informó otra operación para este intento',
             'contracargo' => 'Mercado Pago informó un contracargo',
             'reembolsado' => 'el pago fue reembolsado',
+            'en_mediacion' => 'el comprador abrió un reclamo en Mercado Pago',
+            'reembolso_parcial' => 'se devolvió una parte del pago',
             default => $this->pago->detalle_estado ?? 'sin detalle',
         };
     }

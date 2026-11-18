@@ -30,6 +30,7 @@ class Pago extends Model
         'importe_cobrado',
         'estado',
         'detalle_estado',
+        'motivo_revision_resuelta',
         'medio_pago_mercado_pago',
         'pagado_en',
     ];

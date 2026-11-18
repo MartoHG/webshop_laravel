@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('importe_cobrado', 15, 2);
             $table->string('estado', 30);
             $table->string('detalle_estado', 255)->nullable();
+            $table->string('motivo_revision_resuelta', 40)->nullable();
             $table->string('medio_pago_mercado_pago', 40)->nullable();
             $table->timestamp('pagado_en')->nullable();
             $table->timestamps();

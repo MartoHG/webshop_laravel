@@ -14,6 +14,8 @@ use App\Models\Pedido;
 use App\Models\RegistroAuditoria;
 use App\Models\ReglaPrecioPago;
 use App\Models\Usuario;
+use App\Notifications\Pedidos\AlertaAvisoMercadoPagoFallido;
+use App\Notifications\Pedidos\AlertaPagoEnRevision;
 use App\Servicios\Pagos\ErrorMercadoPago;
 use App\Servicios\Pagos\MercadoPagoCliente;
 use App\Servicios\Pagos\PagoService;
@@ -21,7 +23,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\TestWith;
+use RuntimeException;
 use Tests\TestCase;
 
 class PagosMercadoPagoTest extends TestCase
@@ -704,6 +710,54 @@ class PagosMercadoPagoTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_falla_definitiva_del_aviso_alerta_solo_a_administradores_activos(): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $otroAdministrador = Usuario::factory()->administrador()->create();
+        $inactivo = Usuario::factory()->administrador()->create(['activo' => false]);
+        $cliente = Usuario::factory()->create();
+
+        (new ProcesarNotificacionMercadoPago('777'))->failed(new ErrorMercadoPago('Mercado Pago respondió con un error.', 500));
+
+        Notification::assertSentTo($administrador, AlertaAvisoMercadoPagoFallido::class, function (AlertaAvisoMercadoPagoFallido $alerta) use ($administrador): bool {
+            return str_contains(implode(' ', $alerta->toMail($administrador)->introLines), 'pago número 777');
+        });
+        Notification::assertSentTo($otroAdministrador, AlertaAvisoMercadoPagoFallido::class);
+        Notification::assertNotSentTo($inactivo, AlertaAvisoMercadoPagoFallido::class);
+        Notification::assertNotSentTo($cliente, AlertaAvisoMercadoPagoFallido::class);
+        Notification::assertSentTimes(AlertaAvisoMercadoPagoFallido::class, 2);
+    }
+
+    public function test_falla_definitiva_del_aviso_no_registra_el_mensaje_de_la_excepcion(): void
+    {
+        Notification::fake();
+        Log::spy();
+        $mensaje = 'No se pudo procesar un aviso de Mercado Pago después de todos los reintentos.';
+
+        (new ProcesarNotificacionMercadoPago('779'))->failed(new RuntimeException("SQLSTATE: insert into pedidos values ('ana@example.test')"));
+        (new ProcesarNotificacionMercadoPago('780'))->failed(new ErrorMercadoPago('Mercado Pago respondió con un error.', 503));
+
+        Log::shouldHaveReceived('error', [$mensaje, [
+            'id_pago_mercado_pago' => '779',
+            'excepcion' => RuntimeException::class,
+        ]])->once();
+        Log::shouldHaveReceived('error', [$mensaje, [
+            'id_pago_mercado_pago' => '780',
+            'excepcion' => ErrorMercadoPago::class,
+            'status' => 503,
+        ]])->once();
+    }
+
+    public function test_aviso_con_error_de_servidor_relanza_la_excepcion_para_reintentar(): void
+    {
+        Http::fake([self::URL_PAGOS.'/778' => Http::response([], 500)]);
+
+        $this->expectException(ErrorMercadoPago::class);
+
+        (new ProcesarNotificacionMercadoPago('778'))->handle(app(MercadoPagoCliente::class), app(PagoService::class));
+    }
+
     public function test_dinero_en_cuenta_crea_preferencia_restringida_y_guarda_su_id(): void
     {
         $this->travelTo('2026-10-10 12:00:00.123 UTC');
@@ -989,6 +1043,320 @@ class PagosMercadoPagoTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->fresh()->estado);
+    }
+
+    public function test_reembolso_repetido_de_un_pago_aprobado_abre_revision_y_alerta_una_vez(): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->aprobarPagoPendiente($pedido);
+        $servicio = app(PagoService::class);
+        $aviso = $this->respuestaMp([
+            'id' => $pago->id_pago_mercado_pago,
+            'status' => 'refunded',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]);
+
+        $servicio->aplicarPagoMercadoPago($aviso);
+        $servicio->aplicarPagoMercadoPago($aviso);
+        $servicio->aplicarPagoMercadoPago($aviso);
+
+        $pago->refresh();
+        $pedido->refresh();
+
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->estado);
+        $this->assertSame('reembolsado', $pago->detalle_estado);
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->estado_pedido);
+        $this->assertSame(EstadoPago::Pagado, $pedido->estado_pago);
+        $this->assertSame(1, RegistroAuditoria::query()->where('accion', 'pago.requiere_revision')->count());
+        Notification::assertSentTo($administrador, AlertaPagoEnRevision::class);
+        Notification::assertSentTimes(AlertaPagoEnRevision::class, 1);
+    }
+
+    public function test_reembolso_de_un_pago_descartado_solo_se_audita_y_permite_otro_intento(): void
+    {
+        Notification::fake();
+        Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = Pago::factory()->for($pedido, 'pedido')->create([
+            'estado' => EstadoIntentoPago::Cancelado,
+            'detalle_estado' => 'descartado_por_administrador',
+            'motivo_revision_resuelta' => 'importe_distinto',
+            'id_pago_mercado_pago' => '901',
+        ])->refresh();
+        $atributos = $pago->getAttributes();
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => '901',
+            'status' => 'refunded',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $this->assertSame($atributos, $pago->refresh()->getAttributes());
+        $pedido->refresh();
+        $this->assertSame(EstadoPedido::PendienteCoordinacion, $pedido->estado_pedido);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->estado_pago);
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.devolucion_registrada')->sole();
+        $this->assertEquals([
+            'motivo' => 'reembolsado',
+            'estado' => 'cancelado',
+            'estado_mercado_pago' => 'refunded',
+        ], $registro->datos_nuevos);
+        Notification::assertNothingSent();
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos", [
+            'regla_precio_pago_id' => $this->reglaCredito(3, '20')->id,
+        ])->assertCreated();
+    }
+
+    public function test_contracargo_de_un_pago_aprobado_abre_revision_y_alerta(): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->aprobarPagoPendiente($pedido);
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => $pago->id_pago_mercado_pago,
+            'status' => 'charged_back',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->estado);
+        $this->assertSame('contracargo', $pago->detalle_estado);
+        Notification::assertSentTo($administrador, AlertaPagoEnRevision::class);
+        Notification::assertSentTimes(AlertaPagoEnRevision::class, 1);
+    }
+
+    public function test_mediacion_de_un_pago_aprobado_abre_revision_y_explica_el_reclamo(): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->aprobarPagoPendiente($pedido);
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => $pago->id_pago_mercado_pago,
+            'status' => 'in_mediation',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->estado);
+        $this->assertSame('en_mediacion', $pago->detalle_estado);
+        Notification::assertSentTo($administrador, AlertaPagoEnRevision::class);
+        Notification::assertSentTimes(AlertaPagoEnRevision::class, 1);
+        $mail = (new AlertaPagoEnRevision($pedido, $pago))->toMail($administrador);
+        $this->assertStringContainsString('el comprador abrió un reclamo en Mercado Pago', implode(' ', $mail->introLines));
+    }
+
+    public function test_reembolso_parcial_repetido_abre_revision_y_alerta_una_vez(): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->aprobarPagoPendiente($pedido);
+        $servicio = app(PagoService::class);
+        $aviso = $this->respuestaMp([
+            'id' => $pago->id_pago_mercado_pago,
+            'status_detail' => 'partially_refunded',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]);
+
+        $servicio->aplicarPagoMercadoPago($aviso);
+        $servicio->aplicarPagoMercadoPago($aviso);
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->estado);
+        $this->assertSame('reembolso_parcial', $pago->detalle_estado);
+        Notification::assertSentTo($administrador, AlertaPagoEnRevision::class);
+        Notification::assertSentTimes(AlertaPagoEnRevision::class, 1);
+    }
+
+    public function test_reembolso_repetido_no_reabre_una_revision_aceptada(): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->aprobarPagoPendiente($pedido);
+        $servicio = app(PagoService::class);
+        $aviso = $this->respuestaMp([
+            'id' => $pago->id_pago_mercado_pago,
+            'status' => 'refunded',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]);
+        $servicio->aplicarPagoMercadoPago($aviso);
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pago->id}/resolver", [
+                'decision' => 'aceptar',
+                'nota' => 'Reembolso revisado con el cliente.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('pago.estado', 'pagado');
+
+        $servicio->aplicarPagoMercadoPago($aviso);
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::Pagado, $pago->estado);
+        $this->assertSame('aceptado_por_administrador', $pago->detalle_estado);
+        $this->assertSame('reembolsado', $pago->motivo_revision_resuelta);
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.revision_resuelta')->sole();
+        $this->assertSame('reembolsado', $registro->datos_nuevos['motivo_resuelto']);
+        $this->assertSame(1, RegistroAuditoria::query()->where('accion', 'pago.revision_ya_resuelta')->count());
+        Notification::assertSentTo($administrador, AlertaPagoEnRevision::class);
+        Notification::assertSentTimes(AlertaPagoEnRevision::class, 1);
+    }
+
+    #[TestWith(['901'])]
+    #[TestWith(['902'])]
+    public function test_aprobacion_repetida_no_reabre_una_revision_descartada(string $idAviso): void
+    {
+        Notification::fake();
+        $administrador = Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pago = $this->pagoEnRevision($pedido, '901', 'importe_distinto');
+
+        $this->actingAs($administrador)
+            ->postJson("/administracion/pedidos/{$pedido->id}/pagos/{$pago->id}/resolver", [
+                'decision' => 'descartar',
+                'nota' => 'Devuelto desde Mercado Pago.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('pago.estado', 'cancelado');
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => $idAviso,
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::Cancelado, $pago->estado);
+        $this->assertSame('descartado_por_administrador', $pago->detalle_estado);
+        $this->assertSame('importe_distinto', $pago->motivo_revision_resuelta);
+        $this->assertSame('901', $pago->id_pago_mercado_pago);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        $this->assertSame(1, RegistroAuditoria::query()->where('accion', 'pago.revision_ya_resuelta')->count());
+        Notification::assertNothingSent();
+    }
+
+    public function test_reembolso_de_un_intento_pendiente_lo_cierra_y_la_conciliacion_ya_no_lo_consulta(): void
+    {
+        Notification::fake();
+        Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado(['estado_pago' => EstadoPago::Pendiente]);
+        $pago = $this->pagoPendiente($pedido);
+        $pago->forceFill(['id_pago_mercado_pago' => '560'])->save();
+        DB::table('pagos')->where('id', $pago->id)->update(['updated_at' => now()->subMinutes(20)]);
+
+        Http::fake([self::URL_PAGOS.'/560' => Http::response($this->respuestaMp([
+            'id' => 560,
+            'status' => 'refunded',
+            'status_detail' => 'refunded',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 200)]);
+
+        $this->artisan('pagos:conciliar')
+            ->expectsOutputToContain('Pagos conciliados: 1. Con error: 0.')
+            ->assertSuccessful();
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::Cancelado, $pago->estado);
+        $this->assertSame('devuelto_en_mercado_pago', $pago->detalle_estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        $this->assertSame(EstadoPedido::PendienteCoordinacion, $pedido->fresh()->estado_pedido);
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.devolucion_registrada')->sole();
+        $this->assertSame(['estado' => 'pendiente'], $registro->datos_anteriores);
+        $this->assertSame('reembolsado', $registro->datos_nuevos['motivo']);
+        $this->assertSame('cancelado', $registro->datos_nuevos['estado']);
+        Notification::assertNothingSent();
+
+        $this->travel(20)->minutes();
+
+        $this->artisan('pagos:conciliar')
+            ->expectsOutputToContain('Pagos conciliados: 0. Con error: 0.')
+            ->assertSuccessful();
+
+        Http::assertSentCount(1);
+        $this->assertSame(1, RegistroAuditoria::query()->where('accion', 'pago.devolucion_registrada')->count());
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos", [
+            'regla_precio_pago_id' => $this->reglaCredito(3, '20')->id,
+        ])->assertCreated();
+    }
+
+    public function test_reembolso_de_un_intento_creado_lo_cierra_sin_cambiar_el_pedido(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = Pago::factory()->for($pedido, 'pedido')->create();
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => 561,
+            'status' => 'refunded',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::Cancelado, $pago->estado);
+        $this->assertSame('devuelto_en_mercado_pago', $pago->detalle_estado);
+        $this->assertSame('561', $pago->id_pago_mercado_pago);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        $this->assertSame(1, RegistroAuditoria::query()->where('accion', 'pago.devolucion_registrada')->count());
+    }
+
+    public function test_aviso_pendiente_despues_del_aprobado_conserva_el_pago_confirmado(): void
+    {
+        Notification::fake();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->aprobarPagoPendiente($pedido);
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => $pago->id_pago_mercado_pago,
+            'status' => 'pending',
+            'status_detail' => 'pending_contingency',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $pago->refresh();
+        $pedido->refresh();
+        $this->assertSame(EstadoIntentoPago::Pagado, $pago->estado);
+        $this->assertSame('accredited', $pago->detalle_estado);
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->estado_pedido);
+        $this->assertSame(EstadoPago::Pagado, $pedido->estado_pago);
+    }
+
+    public function test_aprobacion_tras_una_mediacion_conserva_el_motivo_de_revision(): void
+    {
+        Notification::fake();
+        Usuario::factory()->administrador()->create();
+        $pedido = $this->pedidoHabilitado([
+            'estado_pedido' => EstadoPedido::Confirmado,
+            'estado_pago' => EstadoPago::Pagado,
+        ]);
+        $pago = $this->pagoEnRevision($pedido, '903', 'en_mediacion');
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'id' => '903',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::RequiereRevision, $pago->estado);
+        $this->assertSame('en_mediacion', $pago->detalle_estado);
+        Notification::assertNothingSent();
+    }
+
+    private function aprobarPagoPendiente(Pedido $pedido): Pago
+    {
+        $pago = $this->pagoPendiente($pedido);
+
+        app(PagoService::class)->aplicarPagoMercadoPago($this->respuestaMp([
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]));
+
+        return $pago->refresh();
     }
 
     private function pagoEnRevision(Pedido $pedido, string $idMercadoPago, string $motivo): Pago

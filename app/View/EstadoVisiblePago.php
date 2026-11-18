@@ -26,10 +26,13 @@ class EstadoVisiblePago
     ];
 
     /**
+     * Un pedido pagado se muestra pagado aunque tenga un intento en revisión: la revisión es para el administrador.
+     * Si el pedido no está pagado, la revisión tiene prioridad sobre el resto de los estados.
+     *
      * @param  ?array{estado: string}  $intentoVigente
      * @return array{clave: string, titulo: string, texto: string, color: string}
      */
-    public static function paraPago(string $estadoPago, ?array $intentoVigente): array
+    public static function paraPago(string $estadoPago, ?array $intentoVigente, bool $hayPagoEnRevision = false): array
     {
         return match (true) {
             $estadoPago === 'pagado' => self::estado(
@@ -38,16 +41,16 @@ class EstadoVisiblePago
                 'Ya lo estamos preparando. Te mandamos el detalle a tu email.',
                 'amarillo',
             ),
+            $hayPagoEnRevision || ($estadoPago === 'pendiente' && ($intentoVigente['estado'] ?? null) !== 'pendiente') => self::estado(
+                'revision',
+                'Estamos revisando tu pago.',
+                'Recibimos tu pago y lo estamos revisando. Te contactamos por WhatsApp.',
+                'celeste',
+            ),
             $estadoPago === 'pendiente' && ($intentoVigente['estado'] ?? null) === 'pendiente' => self::estado(
                 'pendiente',
                 'Estamos confirmando tu pago.',
                 'Puede tardar unos minutos. No lo vuelvas a intentar: esta página se actualiza sola cuando tengamos la respuesta.',
-                'celeste',
-            ),
-            $estadoPago === 'pendiente' => self::estado(
-                'revision',
-                'Estamos revisando tu pago.',
-                'Recibimos tu pago y lo estamos revisando. Te contactamos por WhatsApp.',
                 'celeste',
             ),
             $estadoPago === 'habilitado' => self::estado(

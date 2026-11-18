@@ -34,6 +34,7 @@ class PagoFactory extends Factory
             'importe_cobrado' => '1111.12',
             'estado' => EstadoIntentoPago::Creado,
             'detalle_estado' => null,
+            'motivo_revision_resuelta' => null,
             'medio_pago_mercado_pago' => null,
             'pagado_en' => null,
         ];

@@ -234,6 +234,65 @@ class VistasPagoTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_con_el_pedido_pagado_la_pagina_se_titula_recibimos_tu_pago(): void
+    {
+        $pedido = $this->pedidoPagado();
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559']))
+            ->assertOk()
+            ->assertSee('<title>Recibimos tu pago · El Refugio</title>', false)
+            ->assertSee('>Recibimos tu pago</h1>', false)
+            ->assertSee('¡Listo! Recibimos tu pago.')
+            ->assertDontSee('Pagá tu pedido');
+
+        $this->get(route('pago.mostrar', $this->pedidoHabilitado()->token_pago))
+            ->assertOk()
+            ->assertSee('<title>Pagá tu pedido · El Refugio</title>', false)
+            ->assertSee('>Pagá tu pedido</h1>', false);
+    }
+
+    public function test_un_pedido_pagado_con_un_pago_en_revision_se_muestra_pagado(): void
+    {
+        $pedido = $this->pedidoPagado();
+        $this->pagoCon($pedido, EstadoIntentoPago::RequiereRevision, 'reembolsado');
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559']))
+            ->assertOk()
+            ->assertSee('<title>Recibimos tu pago · El Refugio</title>', false)
+            ->assertSee('¡Listo! Recibimos tu pago.')
+            ->assertDontSee('Estamos revisando tu pago.')
+            ->assertDontSee('Elegí cómo pagar')
+            ->assertDontSee('sdk.mercadopago.com');
+
+        $this->htmx('GET', route('pago.estado', $pedido->token_pago))
+            ->assertOk()
+            ->assertSee('¡Listo! Recibimos tu pago.')
+            ->assertDontSee('Estamos revisando tu pago.');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_la_preferencia_vencida_explica_por_que_hay_que_elegir_de_nuevo(): void
+    {
+        $this->freezeSecond();
+        $pedido = $this->pedidoHabilitado();
+        $this->reglaActiva(TipoMedioPago::DineroEnCuenta, 1, '20');
+        $this->pagoConPreferencia($pedido);
+        $url = route('pago.mostrar', $pedido->token_pago);
+        $aviso = 'Pasaron más de 30 minutos y el pago con tu cuenta de Mercado Pago venció. Elegí de nuevo cómo querés pagar.';
+
+        $this->get($url)
+            ->assertOk()
+            ->assertDontSee($aviso);
+
+        $this->travel(31)->minutes();
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSeeInOrder([$aviso, 'Elegí cómo pagar', 'Dinero en Mercado Pago'])
+            ->assertDontSee('id="pago-brick"', false);
+    }
+
     #[TestWith(['payment_id=559&status=approved'])]
     #[TestWith(['payment_id=&collection_id=559&collection_status=pending'])]
     public function test_el_regreso_con_error_500_y_estado_en_curso_deja_el_pago_pendiente(string $consulta): void
@@ -504,6 +563,37 @@ class VistasPagoTest extends TestCase
             ->assertOk()
             ->assertSee('Estamos revisando tu pago.')
             ->assertSee('Te contactamos por WhatsApp.')
+            ->assertDontSee('every 5s');
+    }
+
+    public function test_la_pagina_con_un_pago_en_revision_oculta_las_modalidades_y_el_brick(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $this->reglaActiva(TipoMedioPago::Credito, 3, '20');
+        $this->pagoCon($pedido, EstadoIntentoPago::RequiereRevision, 'medio_distinto');
+        $this->pagoCon($pedido, EstadoIntentoPago::Creado);
+
+        $this->get(route('pago.mostrar', $pedido->token_pago))
+            ->assertOk()
+            ->assertSee('Estamos revisando tu pago.')
+            ->assertDontSee('Elegí cómo pagar')
+            ->assertDontSee('Todavía no hay formas de pago')
+            ->assertDontSee(route('pago.intentos.crear', $pedido->token_pago))
+            ->assertDontSee('name="regla_precio_pago_id"', false)
+            ->assertDontSee('id="pago-intento"', false)
+            ->assertDontSee('sdk.mercadopago.com')
+            ->assertDontSee('every 5s');
+    }
+
+    public function test_el_estado_htmx_de_un_pedido_habilitado_muestra_la_revision(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $this->pagoCon($pedido, EstadoIntentoPago::RequiereRevision, 'medio_distinto');
+
+        $this->htmx('GET', route('pago.estado', $pedido->token_pago), [], ['X-Sondeo' => '1'])
+            ->assertOk()
+            ->assertSee('Estamos revisando tu pago.')
+            ->assertDontSee('El pago no se aprobó')
             ->assertDontSee('every 5s');
     }
 

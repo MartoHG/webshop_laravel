@@ -47,6 +47,9 @@ class PagoService
 
     private const string MENSAJE_EN_REVISION = 'Hay un pago en revisión para este pedido. Te contactamos por WhatsApp.';
 
+    /** @var list<string> */
+    private const array MOTIVOS_DE_DEVOLUCION = ['reembolsado', 'contracargo', 'en_mediacion', 'reembolso_parcial'];
+
     /** @var list<int> Respuestas 4xx que no garantizan que Mercado Pago no haya procesado la operación. */
     private const array ESTADOS_4XX_AMBIGUOS = [408, 409, 425];
 
@@ -373,7 +376,8 @@ class PagoService
         ];
     }
 
-    private function hayPagoEnRevision(Pedido $pedido): bool
+    /** Indica si el pedido tiene algún intento de pago en revisión. */
+    public function hayPagoEnRevision(Pedido $pedido): bool
     {
         return Pago::query()
             ->where('pedido_id', $pedido->getKey())
@@ -590,7 +594,9 @@ class PagoService
                 'approved' => $this->aplicarAprobado($pedido, $pago, $pagoMp),
                 'rejected', 'cancelled' => $this->aplicarNoAprobado($pedido, $pago, $pagoMp),
                 'in_process', 'pending', 'authorized' => $this->aplicarEnCurso($pedido, $pago, $pagoMp),
-                'refunded', 'charged_back' => $this->aplicarDevuelto($pago, $pagoMp),
+                'refunded' => $this->aplicarDevolucion($pedido, $pago, $pagoMp, 'reembolsado'),
+                'charged_back' => $this->aplicarDevolucion($pedido, $pago, $pagoMp, 'contracargo'),
+                'in_mediation' => $this->aplicarDevolucion($pedido, $pago, $pagoMp, 'en_mediacion'),
                 default => $this->ignorarEstado($pago, $pagoMp),
             };
         });
@@ -665,6 +671,10 @@ class PagoService
                 'estado_pago' => $pedido->estado_pago->value,
             ];
 
+            $pago->motivo_revision_resuelta = $pago->detalle_estado === null
+                ? null
+                : Str::limit($pago->detalle_estado, 40, '');
+
             match ($decision) {
                 'aceptar' => $this->aceptarRevision($pedido, $pago),
                 'descartar' => $this->descartarRevision($pedido, $pago),
@@ -674,6 +684,7 @@ class PagoService
             $this->auditoria->registrar('pago.revision_resuelta', $pago, $anteriores, [
                 'decision' => $decision,
                 'nota' => $nota,
+                'motivo_resuelto' => $pago->motivo_revision_resuelta,
                 'estado' => $pago->estado->value,
                 'estado_pedido' => $pedido->estado_pedido->value,
                 'estado_pago' => $pedido->estado_pago->value,
@@ -964,16 +975,34 @@ class PagoService
      */
     private function aplicarAprobado(Pedido $pedido, Pago $pago, array $pagoMp): Pago
     {
-        $mismoPago = ! $this->idDistinto($pago, $pagoMp);
-
-        if ($pago->estado === EstadoIntentoPago::Pagado && $mismoPago) {
-            return $pago;
+        if ($pago->detalle_estado === 'descartado_por_administrador') {
+            return $this->registrarAvisoYaResuelto($pago, $pagoMp, 'descartado_por_administrador');
         }
 
-        if (! $mismoPago) {
+        if ($this->idDistinto($pago, $pagoMp)) {
             return $pago->estado === EstadoIntentoPago::Pagado
                 ? $this->registrarInconsistencia($pago, $pagoMp, 'id_distinto')
                 : $this->enRevision($pago, $pagoMp, 'id_distinto');
+        }
+
+        if (
+            ($pagoMp['status_detail'] ?? null) === 'partially_refunded'
+            && in_array($pago->estado, [EstadoIntentoPago::Pagado, EstadoIntentoPago::RequiereRevision], true)
+        ) {
+            return $this->enRevision($pago, $pagoMp, 'reembolso_parcial');
+        }
+
+        if ($pago->estado === EstadoIntentoPago::Pagado) {
+            return $pago;
+        }
+
+        if ($pago->estado === EstadoIntentoPago::RequiereRevision && in_array($pago->detalle_estado, self::MOTIVOS_DE_DEVOLUCION, true)) {
+            Log::info('La aprobación de Mercado Pago conserva el motivo de revisión del intento.', [
+                'pago_id' => $pago->getKey(),
+                'motivo' => $pago->detalle_estado,
+            ]);
+
+            return $pago;
         }
 
         $motivo = $this->motivoDeRevision($pedido, $pago, $pagoMp);
@@ -1108,15 +1137,66 @@ class PagoService
     }
 
     /**
+     * Reembolso, contracargo o mediación. Sobre un pago que contó abre revisión; sobre un intento abierto, que nunca
+     * contó, lo cierra para que el pedido no quede bloqueado; sobre uno cancelado o rechazado solo audita.
+     *
      * @param  array<string, mixed>  $pagoMp
      */
-    private function aplicarDevuelto(Pago $pago, array $pagoMp): Pago
+    private function aplicarDevolucion(Pedido $pedido, Pago $pago, array $pagoMp, string $motivo): Pago
     {
         if ($this->idDistinto($pago, $pagoMp)) {
             return $this->registrarInconsistencia($pago, $pagoMp, 'id_distinto');
         }
 
-        return $this->enRevision($pago, $pagoMp, ($pagoMp['status'] ?? null) === 'charged_back' ? 'contracargo' : 'reembolsado');
+        if (in_array($pago->estado, [EstadoIntentoPago::Pagado, EstadoIntentoPago::RequiereRevision], true)) {
+            return $this->enRevision($pago, $pagoMp, $motivo);
+        }
+
+        if (in_array($pago->estado, EstadoIntentoPago::abiertos(), true)) {
+            return $this->cerrarIntentoDevuelto($pedido, $pago, $pagoMp, $motivo);
+        }
+
+        return $this->registrarDevolucionSinRevision($pago, $pagoMp, $motivo);
+    }
+
+    /**
+     * Mismo criterio que cancelarSinPagoEnMercadoPago: el pedido vuelve a habilitado si estaba pendiente y no tiene
+     * otro intento pendiente ni en revisión.
+     *
+     * @param  array<string, mixed>  $pagoMp
+     */
+    private function cerrarIntentoDevuelto(Pedido $pedido, Pago $pago, array $pagoMp, string $motivo): Pago
+    {
+        $anterior = $pago->estado->value;
+
+        $this->vincular($pago, $pagoMp);
+        $pago->estado = EstadoIntentoPago::Cancelado;
+        $pago->detalle_estado = 'devuelto_en_mercado_pago';
+        $pago->save();
+
+        if (
+            $pedido->estado_pago === EstadoPago::Pendiente
+            && ! $this->hayOtroPagoPendiente($pedido, $pago)
+            && ! $this->hayPagoEnRevision($pedido)
+        ) {
+            $pedido->estado_pago = EstadoPago::Habilitado;
+            $pedido->save();
+        }
+
+        Log::info('Intento de pago cerrado por una devolución de Mercado Pago.', [
+            'pago_id' => $pago->getKey(),
+            'motivo' => $motivo,
+            'status' => $pagoMp['status'] ?? null,
+        ]);
+
+        $this->auditoria->registrar('pago.devolucion_registrada', $pago, ['estado' => $anterior], [
+            'motivo' => $motivo,
+            'estado' => EstadoIntentoPago::Cancelado->value,
+            'detalle_estado' => 'devuelto_en_mercado_pago',
+            'estado_mercado_pago' => $pagoMp['status'] ?? null,
+        ]);
+
+        return $pago;
     }
 
     /**
@@ -1129,6 +1209,10 @@ class PagoService
     {
         if ($pago->estado === EstadoIntentoPago::RequiereRevision && $pago->detalle_estado === $motivo) {
             return $pago;
+        }
+
+        if ($motivo === $pago->motivo_revision_resuelta) {
+            return $this->registrarAvisoYaResuelto($pago, $pagoMp, $motivo);
         }
 
         $anterior = $pago->estado->value;
@@ -1164,12 +1248,45 @@ class PagoService
 
     private function alertarPagoEnRevision(Pago $pago): void
     {
-        $administradores = Usuario::query()
-            ->where('rol', 'administrador')
-            ->where('activo', true)
-            ->get();
+        $administradores = Usuario::query()->administradoresActivos()->get();
 
         Notification::send($administradores, new AlertaPagoEnRevision($pago->pedido, $pago));
+    }
+
+    /** @param  array<string, mixed>  $pagoMp */
+    private function registrarDevolucionSinRevision(Pago $pago, array $pagoMp, string $motivo): Pago
+    {
+        Log::info('Devolución de Mercado Pago registrada sin abrir una revisión.', [
+            'pago_id' => $pago->getKey(),
+            'motivo' => $motivo,
+            'status' => $pagoMp['status'] ?? null,
+        ]);
+
+        $this->auditoria->registrar('pago.devolucion_registrada', $pago, [], [
+            'motivo' => $motivo,
+            'estado' => $pago->estado->value,
+            'estado_mercado_pago' => $pagoMp['status'] ?? null,
+        ]);
+
+        return $pago;
+    }
+
+    /** @param  array<string, mixed>  $pagoMp */
+    private function registrarAvisoYaResuelto(Pago $pago, array $pagoMp, string $motivo): Pago
+    {
+        Log::info('Aviso de Mercado Pago sobre una revisión ya resuelta.', [
+            'pago_id' => $pago->getKey(),
+            'motivo' => $motivo,
+            'status' => $pagoMp['status'] ?? null,
+        ]);
+
+        $this->auditoria->registrar('pago.revision_ya_resuelta', $pago, [], [
+            'motivo' => $motivo,
+            'estado' => $pago->estado->value,
+            'estado_mercado_pago' => $pagoMp['status'] ?? null,
+        ]);
+
+        return $pago;
     }
 
     /**
