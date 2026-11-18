@@ -16,15 +16,22 @@ class MercadoPagoCliente
 
     /**
      * @param  array<string, mixed>  $cuerpo
+     * @param  ?string  $idDispositivo  Device ID del SDK de Mercado Pago; viaja en la cabecera X-meli-session-id.
      * @return array<string, mixed>
      *
      * @throws ErrorMercadoPago
      */
-    public function crearPago(array $cuerpo, string $claveIdempotencia): array
+    public function crearPago(array $cuerpo, string $claveIdempotencia, ?string $idDispositivo = null): array
     {
+        $cabeceras = ['X-Idempotency-Key' => $claveIdempotencia];
+
+        if ($idDispositivo !== null && $idDispositivo !== '') {
+            $cabeceras['X-meli-session-id'] = $idDispositivo;
+        }
+
         try {
             $respuesta = $this->solicitud()
-                ->withHeaders(['X-Idempotency-Key' => $claveIdempotencia])
+                ->withHeaders($cabeceras)
                 ->post('/v1/payments', $cuerpo);
         } catch (ConnectionException $excepcion) {
             throw new ErrorMercadoPago('No se pudo conectar con Mercado Pago.', null, $excepcion);

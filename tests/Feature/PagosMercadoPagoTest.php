@@ -608,6 +608,95 @@ class PagosMercadoPagoTest extends TestCase
         Http::assertSent(fn (Request $request): bool => $request['transaction_amount'] === 1250.0);
     }
 
+    public function test_el_pago_con_tarjeta_manda_items_comprador_y_direccion_al_antifraude(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->intentoCreado($pedido, $this->reglaCredito(3, '20'));
+        $sku = $pedido->items->first()->sku;
+
+        Http::fake([self::URL_PAGOS => Http::response($this->respuestaMp([
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 201)]);
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos/{$pago->id}/tarjeta", $this->datosTarjeta())
+            ->assertOk()
+            ->assertJsonPath('estado', 'pagado');
+
+        Http::assertSent(fn (Request $request): bool => $request->url() === self::URL_PAGOS
+            && $request['additional_info'] === [
+                'items' => [['id' => $sku, 'title' => 'Silla de jardín - Verde', 'quantity' => 2, 'unit_price' => 400.0]],
+                'payer' => ['first_name' => 'Ana', 'last_name' => 'Gómez'],
+                'shipments' => [
+                    'receiver_address' => [
+                        'zip_code' => $pedido->codigo_postal_envio,
+                        'street_name' => 'Av. Test 4567',
+                        'city_name' => $pedido->localidad_envio,
+                        'state_name' => $pedido->provincia_envio->nombre(),
+                    ],
+                ],
+            ]
+            && ! array_key_exists('device_id', $request->data()));
+    }
+
+    public function test_un_item_sin_color_se_manda_solo_con_el_nombre(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pedido->items()->update(['color' => null]);
+        $pago = $this->intentoCreado($pedido, $this->reglaCredito(3, '20'));
+
+        Http::fake([self::URL_PAGOS => Http::response($this->respuestaMp([
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 201)]);
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos/{$pago->id}/tarjeta", $this->datosTarjeta())
+            ->assertOk();
+
+        Http::assertSent(fn (Request $request): bool => $request['additional_info']['items'][0]['title'] === 'Silla de jardín');
+    }
+
+    public function test_el_device_id_viaja_en_la_cabecera_x_meli_session_id(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->intentoCreado($pedido, $this->reglaCredito(3, '20'));
+
+        Http::fake([self::URL_PAGOS => Http::response($this->respuestaMp([
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 201)]);
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos/{$pago->id}/tarjeta", $this->datosTarjeta(['device_id' => 'armor.abc-123_XYZ']))
+            ->assertOk()
+            ->assertJsonPath('estado', 'pagado');
+
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader('X-meli-session-id', 'armor.abc-123_XYZ')
+            && ! array_key_exists('device_id', $request->data()));
+    }
+
+    public function test_sin_device_id_no_se_manda_la_cabecera_x_meli_session_id(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->intentoCreado($pedido, $this->reglaCredito(3, '20'));
+
+        Http::fake([self::URL_PAGOS => Http::response($this->respuestaMp([
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ]), 201)]);
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos/{$pago->id}/tarjeta", $this->datosTarjeta())
+            ->assertOk()
+            ->assertJsonPath('estado', 'pagado');
+
+        Http::assertSent(fn (Request $request): bool => ! $request->hasHeader('X-meli-session-id'));
+    }
+
+    public function test_device_id_con_caracteres_invalidos_da_422_sin_llamar_a_mercado_pago(): void
+    {
+        $this->rechazarDeviceId('abc 123<script>');
+    }
+
+    public function test_device_id_de_mas_de_255_caracteres_da_422_sin_llamar_a_mercado_pago(): void
+    {
+        $this->rechazarDeviceId(str_repeat('a', 256));
+    }
+
     public function test_webhook_con_firma_valida_despacha_el_procesamiento(): void
     {
         Queue::fake();
@@ -1526,6 +1615,21 @@ class PagosMercadoPagoTest extends TestCase
         $this->assertSame(EstadoIntentoPago::Pagado, $confirmado->fresh()->estado);
         $this->assertSame(EstadoPedido::Confirmado, $pedido->fresh()->estado_pedido);
         $this->assertEquals($pagadoEn, $pedido->fresh()->pagado_en);
+    }
+
+    private function rechazarDeviceId(string $idDispositivo): void
+    {
+        Http::fake();
+
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->intentoCreado($pedido, $this->reglaCredito(3, '20'));
+
+        $this->postJson("/pago/{$pedido->token_pago}/intentos/{$pago->id}/tarjeta", $this->datosTarjeta(['device_id' => $idDispositivo]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('device_id');
+
+        Http::assertNothingSent();
+        $this->assertSame(EstadoIntentoPago::Creado, $pago->fresh()->estado);
     }
 
     /** @param  array<string, mixed>  $atributos */

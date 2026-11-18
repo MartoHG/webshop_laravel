@@ -42,6 +42,7 @@ class ProcesarPagoTarjetaRequest extends FormRequest
             'payer.identification' => ['required', 'array'],
             'payer.identification.type' => ['required', 'string', 'alpha', 'max:10'],
             'payer.identification.number' => ['required', 'regex:/^\d{7,11}$/'],
+            'device_id' => ['nullable', 'string', 'max:255', 'regex:/^[A-Za-z0-9._-]+$/'],
         ];
     }
 
@@ -54,6 +55,7 @@ class ProcesarPagoTarjetaRequest extends FormRequest
             'transaction_amount.regex' => 'El importe debe tener hasta dos decimales.',
             'payer.email.email' => 'Ingresá un email válido.',
             'payer.identification.number.regex' => 'El número de documento no es válido.',
+            'device_id.regex' => 'El identificador del dispositivo no es válido.',
         ];
     }
 }

@@ -446,7 +446,7 @@ class PagoService
      * Valida el intento contra lo fijado antes de llamar a Mercado Pago. Si la API no confirma el pago,
      * el intento queda pendiente y el pedido no vuelve a habilitarse hasta que se resuelva.
      *
-     * @param  array{metodo_seleccionado: string, token: string, payment_method_id: string, issuer_id?: string|int|null, installments: int|string, transaction_amount: string, payer: array{email: string, identification: array{type: string, number: string}}}  $datos
+     * @param  array{metodo_seleccionado: string, token: string, payment_method_id: string, issuer_id?: string|int|null, installments: int|string, transaction_amount: string, payer: array{email: string, identification: array{type: string, number: string}}, device_id?: string|null}  $datos
      * @return array{estado: string, mensaje: string}
      *
      * @throws ValidationException
@@ -461,6 +461,7 @@ class PagoService
             $respuesta = $this->mercadoPago->crearPago(
                 $this->cuerpoDelPago($pedido, $pago, $datos),
                 $pago->clave_idempotencia,
+                $datos['device_id'] ?? null,
             );
         } catch (ErrorMercadoPago $error) {
             if (! $this->esRechazoDefinitivo($error)) {
@@ -816,13 +817,13 @@ class PagoService
     }
 
     /**
-     * @param  array<string, mixed>  $datos
+     * @param  array{metodo_seleccionado: string, token: string, payment_method_id: string, issuer_id?: string|int|null, installments: int|string, transaction_amount: string, payer: array{email: string, identification: array{type: string, number: string}}, device_id?: string|null}  $datos
      * @return array<string, mixed>
      */
     private function cuerpoDelPago(Pedido $pedido, Pago $pago, array $datos): array
     {
         $cuerpo = [
-            // Único lugar donde el importe pasa a float: la API lo exige como número en el JSON.
+            // Los importes pasan a float solo al armar el JSON (acá y en unit_price): la API los exige como número.
             'transaction_amount' => (float) $pago->importe_cobrado,
             'token' => $datos['token'],
             'description' => "Pedido {$pedido->numero} - El Refugio",
@@ -839,6 +840,7 @@ class PagoService
             'statement_descriptor' => (string) config('mercadopago.descriptor'),
             'notification_url' => url('/webhooks/mercadopago'),
             'metadata' => ['pago_id' => $pago->getKey()],
+            'additional_info' => $this->datosAdicionales($pedido),
         ];
 
         if (($datos['issuer_id'] ?? null) !== null) {
@@ -846,6 +848,40 @@ class PagoService
         }
 
         return $cuerpo;
+    }
+
+    /**
+     * Ítems, comprador y dirección de envío que la API usa para el antifraude.
+     *
+     * @return array{items: list<array{id: string, title: string, quantity: int, unit_price: float}>, payer: array{first_name: string, last_name: string}, shipments: array{receiver_address: array<string, string>}}
+     */
+    private function datosAdicionales(Pedido $pedido): array
+    {
+        $pedido->loadMissing('items');
+
+        $direccion = array_filter([
+            'zip_code' => $pedido->codigo_postal_envio,
+            'street_name' => $pedido->direccion_envio,
+            'city_name' => $pedido->localidad_envio,
+            'state_name' => $pedido->provincia_envio?->nombre(),
+        ], fn (?string $valor): bool => $valor !== null);
+
+        return [
+            'items' => $pedido->items->map(fn (ItemPedido $item): array => [
+                'id' => $item->sku,
+                'title' => $item->color !== null ? "{$item->nombre_producto} - {$item->color}" : $item->nombre_producto,
+                'quantity' => $item->cantidad,
+                // Importe como número JSON, igual que transaction_amount.
+                'unit_price' => (float) $item->precio_unitario,
+            ])->values()->all(),
+            'payer' => [
+                'first_name' => $pedido->nombre_cliente,
+                'last_name' => $pedido->apellido_cliente,
+            ],
+            'shipments' => [
+                'receiver_address' => $direccion,
+            ],
+        ];
     }
 
     private function referenciaExterna(Pedido $pedido, Pago $pago): string

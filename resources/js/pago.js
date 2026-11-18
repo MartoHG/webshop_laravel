@@ -75,8 +75,9 @@ function configuracionCuenta(datos) {
 }
 
 function configuracionTarjeta(datos) {
+    const cuotas = Number(datos.cuotas);
     const medios = datos.tipo === 'credito'
-        ? { creditCard: 'all', maxInstallments: Number(datos.cuotas) }
+        ? { creditCard: 'all', maxInstallments: cuotas, minInstallments: cuotas }
         : { debitCard: 'all' };
 
     return {
@@ -95,6 +96,11 @@ function configuracionTarjeta(datos) {
 async function enviarPago(datos, cuerpo) {
     let respuesta;
 
+    const idDispositivo = window.MP_DEVICE_SESSION_ID;
+    const cuerpoConDispositivo = typeof idDispositivo === 'string' && idDispositivo !== ''
+        ? { ...cuerpo, device_id: idDispositivo }
+        : cuerpo;
+
     try {
         respuesta = await fetch(datos.urlTarjeta, {
             method: 'POST',
@@ -103,7 +109,7 @@ async function enviarPago(datos, cuerpo) {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': tokenCsrf(),
             },
-            body: JSON.stringify(cuerpo),
+            body: JSON.stringify(cuerpoConDispositivo),
         });
     } catch {
         // Sin respuesta no se sabe si el cobro llegó a procesarse: el cliente tiene que mirar el estado antes de reintentar.
