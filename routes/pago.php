@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/pago/{token}', [PagoController::class, 'mostrar'])
     ->whereAlphaNumeric('token')
+    ->middleware('throttle:30,1')
     ->name('pago.mostrar');
 
 Route::post('/pago/{token}/intentos', [PagoController::class, 'iniciarIntento'])

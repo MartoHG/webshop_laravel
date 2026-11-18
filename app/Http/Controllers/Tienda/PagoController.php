@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Tienda;
 
 use App\Enums\EstadoIntentoPago;
 use App\Enums\EstadoPago;
+use App\Enums\EstadoPedido;
 use App\Enums\TipoMedioPago;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tienda\IniciarIntentoPagoRequest;
@@ -37,13 +38,36 @@ class PagoController extends Controller
             return response()->json($servicio->resumen($servicio->pedidoPorToken($token)));
         }
 
-        $pedido = $this->pedidoDelLink($request, fn (): Pedido => $servicio->pedidoPorToken($token), $contacto);
+        $idPagoMercadoPago = $this->idPagoDelRegreso($request);
+        $buscarPedido = $idPagoMercadoPago === null
+            ? fn (): Pedido => $servicio->pedidoPorToken($token)
+            : fn (): Pedido => $servicio->pedidoDelToken($token);
+        $pedido = $this->pedidoDelLink($request, $buscarPedido, $contacto);
 
         if (! $pedido instanceof Pedido) {
             return $pedido;
         }
 
-        return view('tienda.pago', $this->datosDeLaPagina($token, $pedido, $servicio, $contacto));
+        $pagoDelRegreso = null;
+
+        if ($idPagoMercadoPago !== null) {
+            $pagoDelRegreso = $servicio->aplicarRegresoDeMercadoPago($pedido, $idPagoMercadoPago, $this->estadoDelRegreso($request));
+            $pedido->refresh();
+
+            $pagado = $pedido->estado_pago === EstadoPago::Pagado && $pedido->estado_pedido !== EstadoPedido::Cancelado;
+
+            if (! $pagado && ! $servicio->linkActivo($pedido)) {
+                return $this->respuestaLinkInactivo($request, $contacto);
+            }
+        }
+
+        return view('tienda.pago', $this->datosDeLaPagina(
+            $token,
+            $pedido,
+            $servicio,
+            $contacto,
+            $pagoDelRegreso?->estado === EstadoIntentoPago::Rechazado,
+        ));
     }
 
     public function iniciarIntento(string $token, IniciarIntentoPagoRequest $request, PagoService $servicio, ContactoService $contacto): JsonResponse|RedirectResponse|View|Response
@@ -117,23 +141,57 @@ class PagoController extends Controller
         return view('tienda.partials.pago-estado', $resultado);
     }
 
+    private function idPagoDelRegreso(Request $request): ?string
+    {
+        $id = $request->query('payment_id');
+
+        if ($id === null || $id === '') {
+            $id = $request->query('collection_id');
+        }
+
+        return is_string($id) && strlen($id) <= 20 && ctype_digit($id) ? $id : null;
+    }
+
+    private function estadoDelRegreso(Request $request): ?string
+    {
+        $estado = $request->query('status');
+
+        if (! is_string($estado) || $estado === '') {
+            $estado = $request->query('collection_status');
+        }
+
+        return is_string($estado) ? $estado : null;
+    }
+
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     token: string, pedido: Pedido, resumen: array<string, mixed>, admitePago: bool,
+     *     opciones: list<array{regla_id: int, tipo_medio_pago: string, cuotas: int, importe: string}>, seleccionada: ?int,
+     *     brick: ?array<string, mixed>, resultado: ?array<string, mixed>, whatsappUrl: ?string, mercadoPagoConfigurado: bool
+     * }
      */
-    private function datosDeLaPagina(string $token, Pedido $pedido, PagoService $servicio, ContactoService $contacto): array
+    private function datosDeLaPagina(string $token, Pedido $pedido, PagoService $servicio, ContactoService $contacto, bool $regresoRechazado): array
     {
         $resumen = $servicio->resumen($pedido);
         $pagoVigente = $servicio->pagoVigente($pedido);
-        $intentoCreado = $pagoVigente !== null && $pagoVigente->estado === EstadoIntentoPago::Creado;
+        $preferenciaVencida = $pagoVigente !== null && $servicio->preferenciaVencida($pagoVigente);
+        $intentoCreado = $pagoVigente !== null && $pagoVigente->estado === EstadoIntentoPago::Creado && ! $preferenciaVencida;
+        $admitePago = $pedido->estado_pago !== EstadoPago::Pagado;
+        $muestraResultado = ! $admitePago
+            || $pedido->estado_pago === EstadoPago::Pendiente
+            || ($regresoRechazado && $pedido->estado_pago === EstadoPago::Habilitado && $pagoVigente === null);
 
         return [
             'token' => $token,
             'pedido' => $pedido,
             'resumen' => $resumen,
+            'admitePago' => $admitePago,
             'opciones' => $this->ordenDeLaPagina($resumen['opciones']),
-            'seleccionada' => $this->opcionDelIntento($resumen['opciones'], $resumen['intento_vigente']),
-            'brick' => $intentoCreado ? $this->datosDelBrick($token, $servicio->configuracionDelIntento($pagoVigente)) : null,
-            'resultado' => $resumen['estado_pago'] === EstadoPago::Pendiente->value
+            'seleccionada' => $admitePago && ! $preferenciaVencida
+                ? $this->opcionDelIntento($resumen['opciones'], $resumen['intento_vigente'])
+                : null,
+            'brick' => $admitePago && $intentoCreado ? $this->datosDelBrick($token, $servicio->configuracionDelIntento($pagoVigente)) : null,
+            'resultado' => $muestraResultado
                 ? $this->datosDelResultado($token, $pedido, $resumen['estado_pago'], $resumen['intento_vigente'], $servicio, $contacto)
                 : null,
             'whatsappUrl' => $contacto->publico()['whatsapp_url'],
@@ -239,14 +297,19 @@ class PagoController extends Controller
                 throw $excepcion;
             }
 
-            if ($this->esHtmx($request)) {
-                return response()->view('tienda.partials.pago-error', ['mensaje' => self::MENSAJE_LINK_INACTIVO], 422);
-            }
-
-            return response()->view('tienda.pago-inactivo', [
-                'whatsappUrl' => $contacto->publico()['whatsapp_url'],
-            ], 404);
+            return $this->respuestaLinkInactivo($request, $contacto);
         }
+    }
+
+    private function respuestaLinkInactivo(Request $request, ContactoService $contacto): Response
+    {
+        if ($this->esHtmx($request)) {
+            return response()->view('tienda.partials.pago-error', ['mensaje' => self::MENSAJE_LINK_INACTIVO], 422);
+        }
+
+        return response()->view('tienda.pago-inactivo', [
+            'whatsappUrl' => $contacto->publico()['whatsapp_url'],
+        ], 404);
     }
 
     private function verPedidoDelCliente(Pedido $pedido): ?string

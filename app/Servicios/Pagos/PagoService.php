@@ -27,6 +27,8 @@ use Throwable;
 
 class PagoService
 {
+    public const int MINUTOS_VIGENCIA_PREFERENCIA = 30;
+
     private const string MENSAJE_EN_PROCESO = 'Ya hay un pago en proceso. Esperá unos minutos o escribinos por WhatsApp.';
 
     private const string MENSAJE_CONFIRMANDO = 'Estamos confirmando tu pago. No lo vuelvas a intentar: en unos minutos te confirmamos el resultado.';
@@ -47,6 +49,9 @@ class PagoService
 
     /** @var list<int> Respuestas 4xx que no garantizan que Mercado Pago no haya procesado la operación. */
     private const array ESTADOS_4XX_AMBIGUOS = [408, 409, 425];
+
+    /** Espera máxima de la consulta del regreso desde Mercado Pago, con el visitante esperando la página. */
+    private const int SEGUNDOS_TIMEOUT_REGRESO = 8;
 
     public function __construct(
         private AuditoriaService $auditoria,
@@ -72,6 +77,15 @@ class PagoService
         }
 
         return $pedido;
+    }
+
+    /**
+     * Mismo criterio que pedidoPorToken: el pedido espera pago, habilitado o con un pago en curso.
+     */
+    public function linkActivo(Pedido $pedido): bool
+    {
+        return $pedido->estado_pedido === EstadoPedido::PendienteCoordinacion
+            && in_array($pedido->estado_pago, [EstadoPago::Habilitado, EstadoPago::Pendiente], true);
     }
 
     /**
@@ -161,6 +175,17 @@ class PagoService
             ->whereIn('estado', EstadoIntentoPago::abiertos())
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * Intento de dinero en cuenta cuya preferencia ya no admite pagos: la página vuelve a ofrecer las modalidades.
+     */
+    public function preferenciaVencida(Pago $pago): bool
+    {
+        return $pago->estado === EstadoIntentoPago::Creado
+            && $pago->tipo_medio_pago === TipoMedioPago::DineroEnCuenta
+            && $pago->created_at !== null
+            && $pago->created_at->lt(now()->subMinutes(self::MINUTOS_VIGENCIA_PREFERENCIA));
     }
 
     /**
@@ -306,11 +331,17 @@ class PagoService
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     items: list<array{title: string, quantity: int, unit_price: float, currency_id: string}>,
+     *     external_reference: string, notification_url: string, back_urls: array{success: string, pending: string, failure: string},
+     *     auto_return: string, expires: bool, expiration_date_from: string, expiration_date_to: string,
+     *     payment_methods: array{excluded_payment_types: list<array{id: string}>, installments: int}, statement_descriptor: string
+     * }
      */
     private function cuerpoDePreferencia(Pedido $pedido, Pago $pago): array
     {
         $urlDelPedido = url('/pago/'.$pedido->token_pago);
+        $ahora = now()->toImmutable();
 
         return [
             'items' => [[
@@ -328,10 +359,13 @@ class PagoService
                 'failure' => $urlDelPedido,
             ],
             'auto_return' => 'approved',
+            'expires' => true,
+            'expiration_date_from' => $ahora->subMinute()->format('Y-m-d\TH:i:s.vP'),
+            'expiration_date_to' => $ahora->addMinutes(self::MINUTOS_VIGENCIA_PREFERENCIA)->format('Y-m-d\TH:i:s.vP'),
             'payment_methods' => [
                 'excluded_payment_types' => array_map(
                     fn (string $tipo): array => ['id' => $tipo],
-                    ['credit_card', 'debit_card', 'ticket', 'atm', 'bank_transfer', 'prepaid_card'],
+                    ['credit_card', 'debit_card', 'ticket', 'atm', 'bank_transfer', 'prepaid_card', 'digital_currency', 'digital_wallet', 'crypto_transfer'],
                 ),
                 'installments' => 1,
             ],
@@ -446,6 +480,86 @@ class PagoService
             'estado' => $pagoAplicado->estado->value,
             'mensaje' => $this->mensajeDelEstado($pagoAplicado->estado),
         ];
+    }
+
+    /**
+     * Al volver de Mercado Pago consulta a la API el pago que indica la dirección y lo aplica por el mismo camino que
+     * el webhook, solo si corresponde a un intento de este pedido. La dirección nunca marca un pago como pagado: si la
+     * API no responde y el estado informado es de un pago en curso o aprobado, el intento queda pendiente para que lo
+     * resuelva la conciliación.
+     *
+     * @return ?Pago El intento que quedó, o null si no se aplicó nada.
+     */
+    public function aplicarRegresoDeMercadoPago(Pedido $pedido, string $idPagoMercadoPago, ?string $estadoInformado): ?Pago
+    {
+        if (! $this->linkActivo($pedido)) {
+            return null;
+        }
+
+        try {
+            $pagoMp = $this->mercadoPago->obtenerPago($idPagoMercadoPago, self::SEGUNDOS_TIMEOUT_REGRESO);
+        } catch (ErrorMercadoPago $error) {
+            if (! in_array($estadoInformado, ['approved', 'pending', 'in_process'], true)) {
+                return null;
+            }
+
+            return $this->dejarRegresoPendiente($pedido, $error->status);
+        }
+
+        $referencia = $pagoMp['external_reference'] ?? null;
+        $pago = is_string($referencia) ? $this->localizarPago($pagoMp) : null;
+
+        if ($pago === null || (int) $pago->pedido_id !== (int) $pedido->getKey() || $referencia !== $this->referenciaExterna($pedido, $pago)) {
+            Log::warning('El pago del regreso de Mercado Pago no corresponde a este pedido.', [
+                'pedido_id' => $pedido->getKey(),
+            ]);
+
+            return null;
+        }
+
+        return $this->aplicarPagoMercadoPago($pagoMp);
+    }
+
+    private function dejarRegresoPendiente(Pedido $pedido, ?int $status): ?Pago
+    {
+        return DB::transaction(function () use ($pedido, $status): ?Pago {
+            $pedido = $this->bloquearPedido($pedido);
+
+            if ($pedido->estado_pedido !== EstadoPedido::PendienteCoordinacion || $pedido->estado_pago !== EstadoPago::Habilitado) {
+                return null;
+            }
+
+            $pago = $this->pagoVigente($pedido);
+
+            if ($pago === null) {
+                return null;
+            }
+
+            $pago = $this->bloquearPago($pago);
+
+            if (
+                $pago->estado !== EstadoIntentoPago::Creado
+                || $pago->tipo_medio_pago !== TipoMedioPago::DineroEnCuenta
+                || $pago->id_orden_mercado_pago === null
+            ) {
+                return null;
+            }
+
+            $pago->estado = EstadoIntentoPago::Pendiente;
+            $pago->detalle_estado = 'regreso_sin_confirmar';
+            $pago->save();
+
+            $pedido->estado_pago = EstadoPago::Pendiente;
+            $pedido->save();
+
+            Log::warning('No se pudo confirmar el pago del regreso de Mercado Pago.', [
+                'pedido_id' => $pedido->getKey(),
+                'pago_id' => $pago->getKey(),
+                'status' => $status,
+            ]);
+
+            return $pago;
+        });
     }
 
     /**
@@ -803,6 +917,33 @@ class PagoService
             $this->auditoria->registrar('pago.cancelado_por_conciliacion', $pagoBloqueado, ['estado' => EstadoIntentoPago::Pendiente->value], [
                 'estado' => EstadoIntentoPago::Cancelado->value,
                 'motivo' => 'sin_pago_en_mercado_pago',
+            ]);
+
+            return true;
+        });
+    }
+
+    /**
+     * Cierra un intento de dinero en cuenta cuya preferencia venció sin pagos en Mercado Pago. El pedido no cambia:
+     * sigue habilitado. Si Mercado Pago informa el pago más tarde, aplicarPagoMercadoPago lo trata como una aprobación tardía.
+     */
+    public function cancelarPreferenciaVencida(Pago $pago): bool
+    {
+        return DB::transaction(function () use ($pago): bool {
+            Pedido::query()->lockForUpdate()->findOrFail($pago->pedido_id);
+            $pago = $this->bloquearPago($pago);
+
+            if (! $this->preferenciaVencida($pago) || $pago->id_orden_mercado_pago === null || $pago->id_pago_mercado_pago !== null) {
+                return false;
+            }
+
+            $pago->estado = EstadoIntentoPago::Cancelado;
+            $pago->detalle_estado = 'preferencia_vencida';
+            $pago->save();
+
+            $this->auditoria->registrar('pago.cancelado_por_conciliacion', $pago, ['estado' => EstadoIntentoPago::Creado->value], [
+                'estado' => EstadoIntentoPago::Cancelado->value,
+                'motivo' => 'preferencia_vencida',
             ]);
 
             return true;

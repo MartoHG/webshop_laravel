@@ -706,6 +706,7 @@ class PagosMercadoPagoTest extends TestCase
 
     public function test_dinero_en_cuenta_crea_preferencia_restringida_y_guarda_su_id(): void
     {
+        $this->travelTo('2026-10-10 12:00:00.123 UTC');
         Http::fake([self::URL_PREFERENCIAS => Http::response(['id' => 'pref-123'], 201)]);
 
         $pedido = $this->pedidoHabilitado();
@@ -739,8 +740,11 @@ class PagosMercadoPagoTest extends TestCase
                 && $request['notification_url'] === url('/webhooks/mercadopago')
                 && $request['back_urls']['success'] === url("/pago/{$pedido->token_pago}")
                 && $request['auto_return'] === 'approved'
+                && $request['expires'] === true
+                && $request['expiration_date_from'] === '2026-10-10T11:59:00.123+00:00'
+                && $request['expiration_date_to'] === '2026-10-10T12:30:00.123+00:00'
                 && $metodos['installments'] === 1
-                && $excluidos === ['atm', 'bank_transfer', 'credit_card', 'debit_card', 'prepaid_card', 'ticket'];
+                && $excluidos === ['atm', 'bank_transfer', 'credit_card', 'crypto_transfer', 'debit_card', 'digital_currency', 'digital_wallet', 'prepaid_card', 'ticket'];
         });
     }
 
@@ -807,6 +811,64 @@ class PagosMercadoPagoTest extends TestCase
         $this->assertSame(EstadoIntentoPago::Pendiente, $pagoFallido->fresh()->estado);
         $this->assertSame(EstadoIntentoPago::Pendiente, $pagoReciente->fresh()->estado);
         Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/558'));
+    }
+
+    public function test_conciliacion_recupera_un_pago_con_dinero_en_cuenta_sin_aviso(): void
+    {
+        $this->freezeSecond();
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->intentoConPreferencia($pedido, 11);
+        $referencia = "{$pedido->numero}:{$pago->id}";
+
+        Http::fake([self::URL_PAGOS.'/search*' => Http::response(['results' => [$this->respuestaMp([
+            'id' => 559,
+            'external_reference' => $referencia,
+            'transaction_amount' => 1111.12,
+            'installments' => 1,
+            'payment_type_id' => 'account_money',
+            'payment_method_id' => 'account_money',
+        ])]])]);
+
+        $this->artisan('pagos:conciliar')
+            ->expectsOutputToContain('Pagos conciliados: 1. Con error: 0.')
+            ->assertSuccessful();
+
+        $pago->refresh();
+        $pedido->refresh();
+        $this->assertSame(EstadoIntentoPago::Pagado, $pago->estado);
+        $this->assertSame('559', $pago->id_pago_mercado_pago);
+        $this->assertSame(EstadoPago::Pagado, $pedido->estado_pago);
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->estado_pedido);
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'external_reference='.rawurlencode($referencia)));
+    }
+
+    public function test_conciliacion_cancela_solo_la_preferencia_sin_pago_que_supera_el_margen(): void
+    {
+        $this->freezeSecond();
+        $pedido = $this->pedidoHabilitado();
+        $vencido = $this->intentoConPreferencia($pedido, 61);
+        $dentroDelMargen = $this->intentoConPreferencia($this->pedidoHabilitado(), 40);
+        $reciente = $this->intentoConPreferencia($this->pedidoHabilitado(), 9);
+        Http::fake([self::URL_PAGOS.'/search*' => Http::response(['results' => []])]);
+
+        $this->artisan('pagos:conciliar')
+            ->expectsOutputToContain('Pagos conciliados: 0. Con error: 0.')
+            ->expectsOutputToContain('Pagos cancelados por no tener pago en Mercado Pago: 1.')
+            ->assertSuccessful();
+
+        $vencido->refresh();
+        $this->assertSame(EstadoIntentoPago::Cancelado, $vencido->estado);
+        $this->assertSame('preferencia_vencida', $vencido->detalle_estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        $this->assertSame(EstadoIntentoPago::Creado, $dentroDelMargen->fresh()->estado);
+        $this->assertSame(EstadoIntentoPago::Creado, $reciente->fresh()->estado);
+
+        $registro = RegistroAuditoria::query()->where('accion', 'pago.cancelado_por_conciliacion')->sole();
+        $this->assertSame($vencido->id, $registro->entidad_id);
+        $this->assertSame(['estado' => 'creado'], $registro->datos_anteriores);
+        $this->assertSame(['estado' => 'cancelado', 'motivo' => 'preferencia_vencida'], $registro->datos_nuevos);
+        Http::assertSentCount(2);
+        Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), rawurlencode("{$reciente->pedido->numero}:{$reciente->id}")));
     }
 
     public function test_admin_acepta_la_revision_y_confirma_el_pedido(): void
@@ -1156,6 +1218,18 @@ class PagosMercadoPagoTest extends TestCase
             'porcentaje_aplicado' => '20.000000',
             'importe_cobrado' => '1250.00',
         ]);
+    }
+
+    private function intentoConPreferencia(Pedido $pedido, int $antiguedadEnMinutos): Pago
+    {
+        $pago = Pago::factory()->for($pedido, 'pedido')->create([
+            'tipo_medio_pago' => TipoMedioPago::DineroEnCuenta,
+            'id_orden_mercado_pago' => 'pref-'.$pedido->getKey(),
+        ]);
+
+        DB::table('pagos')->where('id', $pago->id)->update(['created_at' => now()->subMinutes($antiguedadEnMinutos)]);
+
+        return $pago;
     }
 
     /** @param  array<string, mixed>  $cambios */

@@ -7,6 +7,7 @@ use App\Enums\EstadoIntentoPago;
 use App\Enums\EstadoPago;
 use App\Enums\EstadoPedido;
 use App\Enums\TipoMedioPago;
+use App\Models\Configuracion;
 use App\Models\ItemPedido;
 use App\Models\Pago;
 use App\Models\Pedido;
@@ -14,9 +15,12 @@ use App\Models\ReglaPrecioPago;
 use App\Models\Usuario;
 use DOMDocument;
 use DOMXPath;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as SolicitudHttp;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class VistasPagoTest extends TestCase
@@ -26,6 +30,8 @@ class VistasPagoTest extends TestCase
     private const string CLAVE_PUBLICA = 'TEST-public-key-123';
 
     private const string URL_PREFERENCIAS = 'https://api.mercadopago.com/checkout/preferences';
+
+    private const string URL_PAGOS = 'https://api.mercadopago.com/v1/payments';
 
     protected function setUp(): void
     {
@@ -158,6 +164,231 @@ class VistasPagoTest extends TestCase
             ->assertSee('en 3 cuotas de $416,67');
 
         $this->assertSame((string) $regla->id, $this->modalidadMarcada($respuesta));
+    }
+
+    public function test_la_preferencia_vigente_muestra_el_brick_y_al_vencer_deja_elegir_de_nuevo(): void
+    {
+        $this->freezeSecond();
+        $pedido = $this->pedidoHabilitado();
+        $regla = $this->reglaActiva(TipoMedioPago::DineroEnCuenta, 1, '20');
+        $this->pagoConPreferencia($pedido);
+        $url = route('pago.mostrar', $pedido->token_pago);
+
+        $vigente = $this->get($url)
+            ->assertOk()
+            ->assertSee('id="pago-brick"', false)
+            ->assertSee('data-preference-id="pref-123"', false);
+
+        $this->assertSame((string) $regla->id, $this->modalidadMarcada($vigente));
+
+        $this->travel(31)->minutes();
+
+        $vencida = $this->get($url)
+            ->assertOk()
+            ->assertSee('Elegí cómo pagar')
+            ->assertSee('Dinero en Mercado Pago')
+            ->assertDontSee('id="pago-brick"', false);
+
+        $this->assertNull($this->modalidadMarcada($vencida));
+    }
+
+    public function test_el_regreso_aprobado_confirma_el_pedido_y_muestra_el_resultado_sin_opciones_de_pago(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+        $this->reglaActiva(TipoMedioPago::DineroEnCuenta, 1, '20');
+        Configuracion::query()->create(['clave' => 'contacto.whatsapp', 'valor' => '2284123456']);
+        Http::fake([self::URL_PAGOS.'/559' => Http::response($this->respuestaMp($pedido, $pago, 'approved', 'accredited'))]);
+        $url = route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertViewIs('tienda.pago')
+            ->assertSee('¡Listo! Recibimos tu pago.')
+            ->assertSee('2 × Silla de jardín')
+            ->assertSee('¿Dudas con el pago?')
+            ->assertDontSee('name="regla_precio_pago_id"', false)
+            ->assertDontSee('Todavía no hay formas de pago')
+            ->assertDontSee('id="pago-brick"', false)
+            ->assertDontSee('sdk.mercadopago.com', false);
+
+        $pedido->refresh();
+        $this->assertSame(EstadoPago::Pagado, $pedido->estado_pago);
+        $this->assertSame(EstadoPedido::Confirmado, $pedido->estado_pedido);
+        $this->assertSame(EstadoIntentoPago::Pagado, $pago->fresh()->estado);
+
+        $this->get($url)->assertOk()->assertSee('¡Listo! Recibimos tu pago.');
+        Http::assertSentCount(1);
+    }
+
+    public function test_el_regreso_a_un_pedido_ya_pagado_muestra_el_resultado_sin_consultar_la_api(): void
+    {
+        $pedido = $this->pedidoPagado();
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559']))
+            ->assertOk()
+            ->assertSee('¡Listo! Recibimos tu pago.')
+            ->assertDontSee('Todavía no hay formas de pago')
+            ->assertDontSee('sdk.mercadopago.com', false);
+
+        Http::assertNothingSent();
+    }
+
+    #[TestWith(['payment_id=559&status=approved'])]
+    #[TestWith(['payment_id=&collection_id=559&collection_status=pending'])]
+    public function test_el_regreso_con_error_500_y_estado_en_curso_deja_el_pago_pendiente(string $consulta): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+        Http::fake([self::URL_PAGOS.'/559' => Http::response([], 500)]);
+
+        $this->get(route('pago.mostrar', $pedido->token_pago).'?'.$consulta)
+            ->assertOk()
+            ->assertSee('Estamos confirmando tu pago.')
+            ->assertSee('hx-trigger="every 5s"', false)
+            ->assertSee('hx-get="'.route('pago.estado', $pedido->token_pago).'"', false)
+            ->assertDontSee('id="pago-brick"', false);
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::Pendiente, $pago->estado);
+        $this->assertSame('regreso_sin_confirmar', $pago->detalle_estado);
+        $this->assertNull($pago->id_pago_mercado_pago);
+        $this->assertSame(EstadoPago::Pendiente, $pedido->fresh()->estado_pago);
+        Http::assertSentCount(1);
+    }
+
+    #[TestWith(['payment_id=559'])]
+    #[TestWith(['payment_id=559&status=rejected'])]
+    public function test_el_regreso_con_error_500_sin_estado_en_curso_conserva_el_intento(string $consulta): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+        Http::fake([self::URL_PAGOS.'/559' => Http::response([], 500)]);
+
+        $this->get(route('pago.mostrar', $pedido->token_pago).'?'.$consulta)
+            ->assertOk()
+            ->assertSee('id="pago-brick"', false)
+            ->assertDontSee('Estamos confirmando tu pago.');
+
+        $this->assertSame(EstadoIntentoPago::Creado, $pago->fresh()->estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        Http::assertSentCount(1);
+    }
+
+    public function test_el_regreso_espera_a_la_api_8_segundos_y_si_vence_deja_el_pago_pendiente(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+        $segundosDeEspera = null;
+
+        Http::fake(function (SolicitudHttp $solicitud, array $opciones) use (&$segundosDeEspera): PromiseInterface {
+            $segundosDeEspera = $opciones['timeout'] ?? null;
+
+            return Http::failedConnection('cURL error 28: Operation timed out')($solicitud);
+        });
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']))
+            ->assertOk()
+            ->assertSee('Estamos confirmando tu pago.')
+            ->assertSee('hx-trigger="every 5s"', false);
+
+        $this->assertSame(8, $segundosDeEspera);
+
+        $pago->refresh();
+        $this->assertSame(EstadoIntentoPago::Pendiente, $pago->estado);
+        $this->assertSame('regreso_sin_confirmar', $pago->detalle_estado);
+        $this->assertSame(EstadoPago::Pendiente, $pedido->fresh()->estado_pago);
+    }
+
+    public function test_el_regreso_con_un_pago_de_otro_pedido_conserva_los_dos_pedidos(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+        $otroPedido = $this->pedidoHabilitado();
+        $otroPago = $this->pagoConPreferencia($otroPedido);
+        Http::fake([self::URL_PAGOS.'/559' => Http::response($this->respuestaMp($otroPedido, $otroPago, 'approved', 'accredited'))]);
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']))
+            ->assertOk()
+            ->assertSee($pedido->numero)
+            ->assertDontSee($otroPedido->numero)
+            ->assertDontSee('¡Listo! Recibimos tu pago.');
+
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+        $this->assertSame(EstadoPago::Habilitado, $otroPedido->fresh()->estado_pago);
+        $this->assertSame(EstadoIntentoPago::Creado, $pago->fresh()->estado);
+        $this->assertSame(EstadoIntentoPago::Creado, $otroPago->fresh()->estado);
+    }
+
+    #[TestWith(['payment_id=null&collection_id=559'])]
+    #[TestWith(['payment_id=123456789012345678901'])]
+    #[TestWith(['payment_id[]=559'])]
+    public function test_el_regreso_con_id_invalido_muestra_la_pagina_habitual_sin_consultar_la_api(string $consulta): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $this->pagoConPreferencia($pedido);
+
+        $this->get(route('pago.mostrar', $pedido->token_pago).'?'.$consulta.'&status=approved')
+            ->assertOk()
+            ->assertViewIs('tienda.pago')
+            ->assertSee('id="pago-brick"', false);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_el_regreso_rechazado_muestra_el_motivo_y_las_modalidades_para_reintentar(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+        $this->reglaActiva(TipoMedioPago::DineroEnCuenta, 1, '20');
+        Http::fake([self::URL_PAGOS.'/559' => Http::response($this->respuestaMp($pedido, $pago, 'rejected', 'cc_rejected_high_risk'))]);
+
+        $respuesta = $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']))
+            ->assertOk()
+            ->assertSee('El pago no se aprobó')
+            ->assertSee('El pago no pasó los controles de seguridad.')
+            ->assertSee('name="regla_precio_pago_id"', false)
+            ->assertDontSee('id="pago-brick"', false);
+
+        $this->assertNull($this->modalidadMarcada($respuesta));
+        $this->assertSame(EstadoIntentoPago::Rechazado, $pago->fresh()->estado);
+        $this->assertSame(EstadoPago::Habilitado, $pedido->fresh()->estado_pago);
+
+        // Con un intento nuevo, recargar la dirección del regreso ya no muestra el rechazo anterior.
+        $this->pagoConPreferencia($pedido);
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']))
+            ->assertOk()
+            ->assertDontSee('El pago no se aprobó')
+            ->assertSee('id="pago-brick"', false);
+    }
+
+    public function test_el_regreso_a_un_pedido_cancelado_o_token_invalido_devuelve_404_sin_consultar_la_api(): void
+    {
+        $pedido = $this->pedidoHabilitado(['estado_pedido' => EstadoPedido::Cancelado, 'estado_pago' => EstadoPago::Cancelado]);
+
+        $this->get(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']))
+            ->assertNotFound()
+            ->assertViewIs('tienda.pago-inactivo');
+
+        $this->get(route('pago.mostrar', [str_repeat('a', 48), 'payment_id' => '559', 'status' => 'approved']))
+            ->assertNotFound()
+            ->assertViewIs('tienda.pago-inactivo');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_los_parametros_de_regreso_se_ignoran_en_la_respuesta_json(): void
+    {
+        $pedido = $this->pedidoHabilitado();
+        $pago = $this->pagoConPreferencia($pedido);
+
+        $this->getJson(route('pago.mostrar', [$pedido->token_pago, 'payment_id' => '559', 'status' => 'approved']))
+            ->assertOk()
+            ->assertJsonPath('estado_pago', 'habilitado')
+            ->assertJsonPath('intento_vigente.id', $pago->id);
+
+        Http::assertNothingSent();
     }
 
     public function test_una_modalidad_inexistente_muestra_el_aviso_con_htmx_y_redirige_sin_htmx(): void
@@ -398,7 +629,8 @@ class VistasPagoTest extends TestCase
         ], $atributos));
     }
 
-    private function pagoCon(Pedido $pedido, EstadoIntentoPago $estado, ?string $detalle = null): Pago
+    /** @param  array{tipo_medio_pago?: TipoMedioPago, cuotas?: int, id_orden_mercado_pago?: string}  $atributos */
+    private function pagoCon(Pedido $pedido, EstadoIntentoPago $estado, ?string $detalle = null, array $atributos = []): Pago
     {
         return Pago::factory()->for($pedido, 'pedido')->create([
             'estado' => $estado,
@@ -408,6 +640,32 @@ class VistasPagoTest extends TestCase
             'importe_base' => '1000.00',
             'porcentaje_aplicado' => '20.000000',
             'importe_cobrado' => '1250.00',
+            ...$atributos,
         ]);
+    }
+
+    private function pagoConPreferencia(Pedido $pedido): Pago
+    {
+        return $this->pagoCon($pedido, EstadoIntentoPago::Creado, atributos: [
+            'tipo_medio_pago' => TipoMedioPago::DineroEnCuenta,
+            'cuotas' => 1,
+            'id_orden_mercado_pago' => 'pref-123',
+        ]);
+    }
+
+    /** @return array{id: int, status: string, status_detail: string, currency_id: string, transaction_amount: int, installments: int, payment_type_id: string, payment_method_id: string, external_reference: string} */
+    private function respuestaMp(Pedido $pedido, Pago $pago, string $estado, string $detalle): array
+    {
+        return [
+            'id' => 559,
+            'status' => $estado,
+            'status_detail' => $detalle,
+            'currency_id' => 'ARS',
+            'transaction_amount' => 1250,
+            'installments' => 1,
+            'payment_type_id' => 'account_money',
+            'payment_method_id' => 'account_money',
+            'external_reference' => "{$pedido->numero}:{$pago->id}",
+        ];
     }
 }

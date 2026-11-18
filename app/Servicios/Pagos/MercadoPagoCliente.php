@@ -34,14 +34,15 @@ class MercadoPagoCliente
     }
 
     /**
+     * @param  int  $segundosTimeout  Más corto cuando hay un visitante esperando la página.
      * @return array<string, mixed>
      *
      * @throws ErrorMercadoPago
      */
-    public function obtenerPago(string $id): array
+    public function obtenerPago(string $id, int $segundosTimeout = self::SEGUNDOS_TIMEOUT): array
     {
         try {
-            $respuesta = $this->solicitud()->get('/v1/payments/'.rawurlencode($id));
+            $respuesta = $this->solicitud($segundosTimeout)->get('/v1/payments/'.rawurlencode($id));
         } catch (ConnectionException $excepcion) {
             throw new ErrorMercadoPago('No se pudo conectar con Mercado Pago.', null, $excepcion);
         }
@@ -92,12 +93,12 @@ class MercadoPagoCliente
         return array_values(array_filter($datos['results'] ?? [], is_array(...)));
     }
 
-    private function solicitud(): PendingRequest
+    private function solicitud(int $segundosTimeout = self::SEGUNDOS_TIMEOUT): PendingRequest
     {
         return Http::baseUrl((string) config('mercadopago.url_api'))
             ->withToken((string) config('mercadopago.access_token'))
             ->acceptJson()
-            ->timeout(self::SEGUNDOS_TIMEOUT);
+            ->timeout($segundosTimeout);
     }
 
     /**

@@ -1,7 +1,7 @@
 @use('App\Servicios\Precios\FormatoMoneda')
 @use('App\View\OpcionPagoVisible')
 <x-layouts.tienda titulo="Pagá tu pedido">
-    @if ($mercadoPagoConfigurado)
+    @if ($admitePago && $mercadoPagoConfigurado)
         @push('scripts')
             <script src="https://sdk.mercadopago.com/js/v2"></script>
             @vite('resources/js/pago.js')
@@ -37,11 +37,11 @@
             </div>
         </section>
 
-        @if ($opciones === [])
+        @if ($admitePago && $opciones === [])
             <div class="mt-10">
                 <x-aviso tipo="error">Todavía no hay formas de pago disponibles para este pedido. Escribinos por WhatsApp para coordinarlo.</x-aviso>
             </div>
-        @else
+        @elseif ($admitePago)
             <form
                 method="POST"
                 action="{{ route('pago.intentos.crear', $token) }}"
@@ -83,11 +83,13 @@
             </form>
         @endif
 
-        <div id="pago-intento" class="mt-8">
-            @if ($brick !== null)
-                @include('tienda.partials.pago-brick', ['brick' => $brick])
-            @endif
-        </div>
+        @if ($admitePago)
+            <div id="pago-intento" class="mt-8">
+                @if ($brick !== null)
+                    @include('tienda.partials.pago-brick', ['brick' => $brick])
+                @endif
+            </div>
+        @endif
 
         <div id="pago-resultado" aria-live="polite" class="mt-8">
             @if ($resultado !== null)
