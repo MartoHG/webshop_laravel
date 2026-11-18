@@ -32,7 +32,7 @@ La aplicación queda disponible en `http://localhost:8000`. El archivo `.env`, l
 
 ## Estado
 
-El backend de la V1 está completo y responde JSON. Ver [PROXIMOS-PASOS.md](PROXIMOS-PASOS.md) para lo que sigue. Todavía no hay pantallas Blade: el diseño aprobado está en [diseno/boceto/](diseno/boceto/LEEME.md) y las vistas son la próxima fase.
+El backend de la V1 está completo y responde JSON. Ver [.ai/estado.md](.ai/estado.md) para lo que sigue. Todavía no hay pantallas Blade: el diseño aprobado está en [diseno/boceto/](diseno/boceto/LEEME.md) y las vistas son la próxima fase.
 
 Arquitectura: `routes/*.php` (cargadas desde `routes/web.php`) → `app/Http/Controllers` → `app/Http/Requests` (validación y autorización) → `app/Servicios` (lógica de negocio) → `app/Models`.
 
